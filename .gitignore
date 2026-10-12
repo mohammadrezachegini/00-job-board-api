@@ -1,0 +1,26 @@
+# Secrets: real env values never go into git
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment (uv recreates it from uv.lock)
+.venv/
+
+# Tests and coverage (Phase 5)
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Django local artifacts
+db.sqlite3
+staticfiles/
+media/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
