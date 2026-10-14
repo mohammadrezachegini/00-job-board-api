@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /uvx /bin/
 
-ENV PYTHONBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_PYTHON_DOWNLOADS=never \
