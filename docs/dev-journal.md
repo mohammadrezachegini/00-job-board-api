@@ -21,3 +21,11 @@ This journal is updated as new work is pushed.
 - `docs/changelog.md` seeded — from now on the changelog workflow regenerates
   it automatically from commit messages on every push.
 - This dev journal created; it will be updated as new work lands.
+- Evening: the repo owner pushed `.github/workflows/changelog.yml` himself
+  (commit `506097c`, "ci: add changelog workflow") — the one file the
+  assistant's app cannot write. The workflow ran on that same push: about
+  15 seconds later the Actions bot committed `468fb51`
+  ("docs: update changelog") with the regenerated changelog listing all
+  5 commits, and it did not loop. Documentation automation is now live:
+  every future push updates the changelog automatically, and this journal
+  gets a new entry as work lands.
