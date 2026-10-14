@@ -1,0 +1,48 @@
+name: Update changelog
+
+on:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: changelog
+  cancel-in-progress: false
+
+jobs:
+  changelog:
+    # Skip the bot's own changelog commit so this never loops.
+    if: ${{ github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip changelog]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Regenerate docs/changelog.md from commit messages
+        run: |
+          mkdir -p docs
+          {
+            echo "# Changelog"
+            echo
+            echo "Generated automatically from commit messages on every push. Do not edit by hand."
+            echo
+            git log --date=short --pretty=format:'- %ad — %s (%h)' --no-merges
+            echo
+          } > docs/changelog.md
+          cat docs/changelog.md
+
+      - name: Commit changelog if it changed
+        run: |
+          if git diff --quiet -- docs/changelog.md; then
+            echo "Changelog already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/changelog.md
+          git commit -m "docs: update changelog [skip changelog]"
+          git push
