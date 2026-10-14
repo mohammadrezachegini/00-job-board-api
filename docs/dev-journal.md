@@ -37,3 +37,18 @@ This journal is updated as new work is pushed.
   Technical breakdown in `docs/technical-notes.md`, entry 3. Still open
   from Night 3: the Docker Compose file for PostgreSQL and the first
   migration run against it.
+- Still later that evening (commits `aa01775` and `18de30b`, both
+  "Add dev Dockerfile and Compose stack with PostgreSQL 17"): Night 3's
+  missing half landed. The project now has a development `Dockerfile`
+  (Python 3.12 slim, dependencies installed with `uv` from the lockfile,
+  app running as a non-root user on port 8006), a `docker-compose.yml`
+  that starts PostgreSQL 17 alongside the API, and a `.dockerignore`
+  that keeps `.env`, `.git`, and caches out of the image. The database
+  container has a healthcheck, and the API waits until the database is
+  actually healthy — not just started — before it boots. Inside Compose
+  the API is pointed at the database by its service name (`db`) instead
+  of `localhost`, the code folder is mounted into the container so edits
+  show up live, and database data lives in a named volume (`pgdata`) so
+  it survives container restarts. Technical breakdown in
+  `docs/technical-notes.md`, entry 4. Still open: the first migration
+  run against the Compose PostgreSQL is not shown in these commits.
