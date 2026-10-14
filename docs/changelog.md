@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-13 — docs: technical notes entry 3 — env-var settings, PostgreSQL, DRF (147290d)
+- 2026-10-14 — docs: update changelog [skip changelog] (927456c)
 - 2026-10-13 — docs: journal — Night 3 settings/Postgres/DRF push (3328b25)
 - 2026-10-14 — docs: update changelog [skip changelog] (1a99193)
 - 2026-10-13 — Read Django settings from env vars; switch DB to PostgreSQL; add DRF (75eb0d1)
