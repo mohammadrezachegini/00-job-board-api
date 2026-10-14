@@ -29,3 +29,11 @@ This journal is updated as new work is pushed.
   5 commits, and it did not loop. Documentation automation is now live:
   every future push updates the changelog automatically, and this journal
   gets a new entry as work lands.
+- Later that evening (commit `75eb0d1`): Night 3's core work — settings
+  now read everything from environment variables through a small custom
+  `env()` helper that fails fast on missing required values, the database
+  switched from SQLite to PostgreSQL, DRF was registered in
+  `INSTALLED_APPS`, and a committable `.env.example` template was added.
+  Technical breakdown in `docs/technical-notes.md`, entry 3. Still open
+  from Night 3: the Docker Compose file for PostgreSQL and the first
+  migration run against it.
