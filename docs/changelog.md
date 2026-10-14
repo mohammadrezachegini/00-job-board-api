@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-13 — docs: add technical notes (changelog workflow deep-dive + scaffold status) (e1f6bfa)
+- 2026-10-14 — docs: update changelog [skip changelog] (084dc33)
 - 2026-10-13 — docs: journal — changelog workflow is live (1c5c349)
 - 2026-10-14 — docs: update changelog [skip changelog] (468fb51)
 - 2026-10-13 — ci: add changelog workflow (506097c)
