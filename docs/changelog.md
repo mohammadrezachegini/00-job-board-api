@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-13 — Add dev Dockerfile and Compose stack with PostgreSQL 17 (18de30b)
+- 2026-10-13 — Add dev Dockerfile and Compose stack with PostgreSQL 17 (aa01775)
+- 2026-10-14 — docs: update changelog [skip changelog] (225ce82)
 - 2026-10-13 — docs: technical notes entry 3 — env-var settings, PostgreSQL, DRF (147290d)
 - 2026-10-14 — docs: update changelog [skip changelog] (927456c)
 - 2026-10-13 — docs: journal — Night 3 settings/Postgres/DRF push (3328b25)
