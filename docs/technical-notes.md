@@ -107,3 +107,103 @@ startproject` gives you, and what has to change before it is a real API.
 - "What `startproject` really gives you — and the 5 things to fix before line 1 of business logic"
 - "12-factor config in Django: settings from env vars, or it isn't production-shaped"
 - "Lockfiles and disposable virtualenvs: reproducible Python with uv"
+
+---
+
+## Entry 3 — 2026-10-13 — Settings from env vars, PostgreSQL, DRF (commit `75eb0d1`)
+
+This is the Night 3 change that turns the stock scaffold into an
+environment-driven app — the "config" part of the 12-factor methodology:
+*store config in the environment*, so the same code runs on a laptop, in
+Docker, and on AWS/Azure with only the environment changing.
+
+### The `env()` helper — fail fast, no new dependency
+
+```python
+def env(name, default=None):
+    value = os.environ.get(name, default)
+    if value is None:
+        raise ImproperlyConfigured(f"Missing required environment variable: {name}")
+    return value
+```
+
+- Uses only the standard library (`os.environ`) — no `django-environ`
+  dependency needed for reading a handful of variables.
+- The key design decision is what happens when a **required** variable is
+  missing: instead of falling back to a silent default, it raises Django's
+  `ImproperlyConfigured` with the variable's name, and the app refuses to
+  start. A deploy that crashes loudly at boot with "Missing required
+  environment variable: DJANGO_SECRET_KEY" is vastly better than one that
+  starts with a wrong/default secret and fails mysteriously later — or
+  worse, runs insecurely. Fail fast, fail at startup, fail with the name
+  of the thing that is missing.
+
+### Secrets and booleans
+
+- `SECRET_KEY = env("DJANGO_SECRET_KEY")` — required, no fallback. The
+  hardcoded `django-insecure-...` key from the generated scaffold is gone
+  as a live value, so the repo no longer contains a usable secret.
+- `DEBUG = env("DJANGO_DEBUG", "False").lower() in ("1", "true", "yes")` —
+  environment variables are **always strings**, and in Python any non-empty
+  string is truthy, so `bool("False")` is `True` — the classic bug that
+  leaves DEBUG on in production. Parsing the string against an explicit
+  allow-list of true-values avoids it, and the default is `"False"`:
+  debug is off unless someone deliberately turns it on.
+- `ALLOWED_HOSTS` is parsed from one comma-separated string
+  (`"a, b ,c"` → `["a", "b", "c"]`): `split(",")`, `strip()` each entry,
+  drop empties. One env var, any number of hosts.
+
+### Database — SQLite out, PostgreSQL in
+
+```python
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("POSTGRES_DB"),
+        "USER": env("POSTGRES_USER"),
+        "PASSWORD": env("POSTGRES_PASSWORD"),
+        "HOST": env("POSTGRES_HOST", "localhost"),
+        "PORT": env("POSTGRES_PORT", "5432"),
+    }
+}
+```
+
+- Changing `ENGINE` is the whole switch at the Django layer; the actual
+  driver underneath is psycopg 3, already pinned in `pyproject.toml`.
+  Name, user, and password are required env vars (the app will not boot
+  without a database identity); host and port get local-development
+  defaults because they are topology, not secrets.
+- SQLite was fine for a scaffold, but it is a single file with one writer
+  at a time — it cannot be the database for an API that will run in
+  containers and Kubernetes. PostgreSQL is also what the later projects
+  deploy against (RDS / Azure Database), so local now matches production.
+- `.env.example` documents every required variable with placeholder
+  values and is safe to commit; the real `.env` stays gitignored. The
+  example file *is* the setup documentation for the config contract.
+
+### DRF registered
+
+- `"rest_framework"` added to `INSTALLED_APPS` — that single line is what
+  activates Django REST Framework (it was already a declared dependency;
+  until it is in `INSTALLED_APPS` Django does not load it).
+
+### Honest gaps — what this commit does not do yet
+
+- **No `docker-compose.yml` yet** — settings now expect a PostgreSQL
+  server at `POSTGRES_HOST:POSTGRES_PORT`, but nothing in the repo starts
+  one. Compose + the first successful `migrate` against Postgres is the
+  remaining half of Night 3.
+- **The old insecure key still sits in a commented-out block** at the top
+  of `settings.py`. It is dead code, but secret scanners (Gitleaks, which
+  arrives in Project 01) flag strings, not comments — deleting the whole
+  commented scaffold block is a worthwhile cleanup.
+- **The default `ALLOWED_HOSTS` includes `*`** (accept any Host header).
+  Fine on a laptop; it should come out of the defaults before any real
+  deployment, since the env var is the right place for it.
+
+### Article angles
+
+- "Fail fast: why your Django app should refuse to start when a secret is missing"
+- "`bool('False')` is `True` — parsing booleans from env vars without shooting yourself"
+- "12-factor config in practice: one `env()` helper, zero new dependencies"
+- "The day SQLite has to go: switching Django to PostgreSQL is one ENGINE line — the work is everything around it"
