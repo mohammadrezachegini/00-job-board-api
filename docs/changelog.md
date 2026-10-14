@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-13 — docs: technical notes entry 4 — dev Dockerfile and Compose stack (c959e7a)
+- 2026-10-14 — docs: update changelog [skip changelog] (6ff4183)
 - 2026-10-13 — docs: journal — Docker dev stack (Dockerfile + Compose/Postgres 17) (8caa514)
 - 2026-10-14 — docs: update changelog [skip changelog] (263e164)
 - 2026-10-13 — Add dev Dockerfile and Compose stack with PostgreSQL 17 (18de30b)
