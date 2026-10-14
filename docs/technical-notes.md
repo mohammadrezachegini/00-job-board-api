@@ -207,3 +207,185 @@ DATABASES = {
 - "`bool('False')` is `True` — parsing booleans from env vars without shooting yourself"
 - "12-factor config in practice: one `env()` helper, zero new dependencies"
 - "The day SQLite has to go: switching Django to PostgreSQL is one ENGINE line — the work is everything around it"
+
+---
+
+## Entry 4 — 2026-10-13 — Dev Dockerfile and Compose stack with PostgreSQL 17 (commits `aa01775`, `18de30b`)
+
+This closes the gap left open in entry 3: settings already expected a
+PostgreSQL server, and now the repo can start one — plus the app itself —
+with a single `docker compose up`. Two commits a minute apart carry the
+same message and land the same stack; this entry documents the final tree.
+
+### The Dockerfile — small, locked, non-root
+
+```dockerfile
+FROM python:3.12-slim
+
+COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /uvx /bin/
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON_DOWNLOADS=never \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock .python-version ./
+RUN uv sync --locked
+
+COPY . .
+ARG UID=1000
+RUN useradd --create-home --uid ${UID} app
+USER app
+
+EXPOSE 8006
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8006"]
+```
+
+- **Borrowing a binary instead of installing a tool** — `COPY --from=`
+  pulls just the `uv`/`uvx` binaries out of Astral's official image. No
+  pip install, no extra package manager layer, and the version is pinned
+  (`0.13.0`) so the build is reproducible.
+- **Layer ordering is the cache strategy** — only `pyproject.toml`,
+  `uv.lock`, and `.python-version` are copied before `uv sync --locked`.
+  Docker caches that dependency layer and reuses it on every rebuild
+  unless the lockfile changes, even though the app code changes daily.
+  Copying `.` first would throw that cache away on every edit.
+  `--locked` fails the build rather than silently re-resolving if the
+  lockfile and `pyproject.toml` disagree.
+- **The venv deliberately lives outside the app folder** —
+  `UV_PROJECT_ENVIRONMENT=/opt/venv` matters because Compose (below)
+  bind-mounts the host code over `/app`. If the virtualenv were the
+  usual `/app/.venv`, the mount would shadow it and the container would
+  boot with no dependencies. Putting the environment on its own path
+  keeps the mount and the installed packages from colliding.
+  `UV_PYTHON_DOWNLOADS=never` stops uv from fetching its own Python —
+  the base image's 3.12 is the one true interpreter.
+- **`PYTHONUNBUFFERED=1`** makes logs appear in `docker compose logs` in
+  real time instead of sitting in Python's buffer; **`PYTHONDONTWRITEBYTECODE=1`**
+  stops `.pyc` writes inside the container (also avoids permission noise
+  once the bind mount is in play).
+- **Non-root by default** — the image creates an `app` user and switches
+  to it (`USER app`). `ARG UID=1000` defaults to the typical first-user
+  UID on a Linux host, so files created through the bind mount stay owned
+  by the developer instead of root. A compromised dev server should not
+  be root in its container.
+- **This is a dev image, honestly labelled** — the `CMD` is Django's
+  built-in `runserver` on `0.0.0.0:8006`. That is the right tool locally
+  (auto-reload with the bind mount), and the wrong tool in production,
+  where a real WSGI server (Gunicorn/uWSGI) belongs. Port 8006 is also
+  what Compose publishes.
+
+### `.dockerignore` — the build context is an attack and bloat surface
+
+```
+.git
+.venv
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+htmlcov/
+```
+
+Everything listed is either huge, useless in an image, or dangerous.
+`.env` is the important one: without this line, `COPY . .` would bake the
+real secrets file into an image layer. The `!.env.example` exception
+mirrors the `.gitignore` pattern from entry 2 — the template stays, the
+secrets stay out.
+
+### docker-compose.yml — two services, one contract
+
+```yaml
+services:
+  db:
+    image: postgres:17
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      - POSTGRES_HOST=db
+    ports:
+      - "8006:8006"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+```
+
+- **One `.env` feeds both containers** — the same `POSTGRES_DB` /
+  `POSTGRES_USER` / `POSTGRES_PASSWORD` variables entry 3 wired into
+  Django are exactly the variables the official `postgres` image uses to
+  bootstrap its database and superuser on first start. A single source
+  of truth means the app and the database can never disagree about the
+  password. (The postgres image only applies them when the data volume
+  is empty — change the password later and you must change it in the
+  database too, or recreate the volume.)
+- **`POSTGRES_HOST=db` is the 12-factor payoff** — `.env.example` sets
+  `POSTGRES_HOST=localhost`, which is correct when Django runs on the
+  host and Postgres is port-forwarded — but inside Compose, `localhost`
+  means *the api container itself*, where no database is listening.
+  Compose's built-in DNS resolves service names, so `db` is the database.
+  The `environment:` block overrides the `env_file:` value for just this
+  topology — same image, same `.env`, no code change. This is entry 3's
+  env-var design doing exactly the job it was built for.
+- **Healthy, not just started** — a plain `depends_on: [db]` only waits
+  for the container to *start*; Postgres then still needs seconds to
+  initialise and accept connections, and Django crashing with
+  "connection refused" on a cold boot is the classic symptom.
+  `condition: service_healthy` holds the api back until the db
+  healthcheck passes: `pg_isready` every 5s, 3s timeout, 10 retries —
+  roughly a 50-second budget. This is the same idea Kubernetes later
+  formalises as readiness probes (direct CKAD crossover).
+- **The `$${...}` double dollar is not a typo** — Compose itself
+  interpolates `${VAR}` in a compose file, which would substitute the
+  *host's* (probably empty) variables at parse time. `$$` escapes that,
+  so the literal `${POSTGRES_USER}` reaches the container and is expanded
+  by the shell *inside* it, where `.env` values actually live.
+- **Named volume `pgdata`** — database files live in a Docker-managed
+  volume mounted at Postgres's data directory, so data survives
+  `docker compose down`, rebuilds, and image updates. It is only
+  destroyed by an explicit `docker compose down -v` — persistence with
+  an intentional delete, not an accidental one.
+- **Bind mount `.:/app` is the dev-loop trade** — host edits are live in
+  the container (and `runserver` auto-reloads), at the cost of the baked
+  image code being shadowed while developing. Production will drop this
+  mount and run only what `COPY` put in the image.
+
+### Honest gaps — what these commits do not do yet
+
+- **No migration evidence** — nothing in these commits runs
+  `manage.py migrate` against the Compose database (no entrypoint script
+  and no recorded run). The stack *can* start; the first migration is
+  still the verification that proves the whole chain end to end.
+- **No `.env` bootstrap step** — both services require a real `.env`
+  (`env_file: .env`); a fresh clone must copy `.env.example` to `.env`
+  first or Compose fails immediately. Worth a line in a README.
+- **Dev-only server** — `runserver`, a bind mount, and `DEBUG` from the
+  local `.env` are all correct for development and none of them should
+  survive into the production images the later projects build.
+
+### Article angles
+
+- "`depends_on` lied to you: why `service_healthy` + `pg_isready` ends the Django/Postgres startup race"
+- "`localhost` is not the database: service-name DNS and the one-line `POSTGRES_HOST=db` override"
+- "The `$$` that saves your healthcheck: escaping variable interpolation in Compose files"
+- "Put the venv outside the code: how `UV_PROJECT_ENVIRONMENT=/opt/venv` makes bind mounts and uv play nicely"
+- "Copy the lockfile first: Docker layer caching is a dependency-management decision"
