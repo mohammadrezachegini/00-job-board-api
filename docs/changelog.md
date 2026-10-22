@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-21 — Fix soem typos (289e2e5)
+- 2026-10-22 — docs: update changelog [skip changelog] (ecc775a)
 - 2026-10-21 — docs: journal — changelog workflow v2 hardening (d8d151a)
 - 2026-10-22 — docs: update changelog [skip changelog] (6615217)
 - 2026-10-21 — updated changelog.yaml (be15a45)
