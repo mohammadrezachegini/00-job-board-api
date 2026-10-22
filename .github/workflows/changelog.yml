@@ -15,34 +15,44 @@ jobs:
   changelog:
     # Skip the bot's own changelog commit so this never loops.
     if: ${{ github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip changelog]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - name: Check out full history
-        uses: actions/checkout@v4
+      - name: Check out the branch at its current head
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.ref_name }}
 
-      - name: Regenerate docs/changelog.md from commit messages
+      - name: Regenerate changelog and push, retrying on races
         run: |
-          mkdir -p docs
-          {
-            echo "# Changelog"
-            echo
-            echo "Generated automatically from commit messages on every push. Do not edit by hand."
-            echo
-            git log --date=short --pretty=format:'- %ad — %s (%h)' --no-merges
-            echo
-          } > docs/changelog.md
-          cat docs/changelog.md
-
-      - name: Commit changelog if it changed
-        run: |
-          if git diff --quiet -- docs/changelog.md; then
-            echo "Changelog already up to date."
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/changelog.md
-          git commit -m "docs: update changelog [skip changelog]"
-          git push
+          for attempt in 1 2 3; do
+            # Always build on the newest head: another push may have landed
+            # while this run was queued or running.
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            mkdir -p docs
+            {
+              echo "# Changelog"
+              echo
+              echo "Generated automatically from commit messages on every push. Do not edit by hand."
+              echo
+              git log --date=short --pretty=format:'- %ad — %s (%h)' --no-merges
+              echo
+            } > docs/changelog.md
+            if git diff --quiet -- docs/changelog.md; then
+              echo "Changelog already up to date."
+              exit 0
+            fi
+            git add docs/changelog.md
+            git commit -m "docs: update changelog [skip changelog]"
+            if git push origin "HEAD:${{ github.ref_name }}"; then
+              echo "Changelog pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected (branch moved) — retrying from the newest head..."
+            sleep 5
+          done
+          echo "Could not push the changelog after 3 attempts."
+          exit 1
