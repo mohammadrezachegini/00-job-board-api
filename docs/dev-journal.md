@@ -62,3 +62,14 @@ This journal is updated as new work is pushed.
   migration, which is the standard price of swapping the user model. This is
   the first piece of Night 4's model work; the Job and Application models are
   still to come. Technical breakdown in `docs/technical-notes.md`, entry 5.
+- 2026-10-21, an hour later (commit `6c728f5`, "Add Company and
+  CandidateProfile models with admin"): the two profile models land, one per
+  role, each linked one-to-one to a user account. A company gets a name,
+  website, description, and an `is_verified` flag (off by default — this is
+  the flag the verified-company permission will check in Night 9). A
+  candidate gets a headline, location, and their skills stored as a real
+  PostgreSQL array, ready for the match scoring in Night 11. Both models are
+  registered in the Django admin, with the user admin extended so staff can
+  see and set roles, and verify companies straight from the list view.
+  Migration `0002` included. Remaining for Night 4: the Job and Application
+  models. Technical breakdown in `docs/technical-notes.md`, entry 6.
