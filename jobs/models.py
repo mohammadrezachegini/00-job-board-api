@@ -48,7 +48,7 @@ class CandidateProfile(models.Model):
     headline = models.CharField(max_length=200, blank=True)
     location = models.CharField(max_length=100, blank=True)
     skills = ArrayField(models.CharField(max_length=50), default=list, blank=True)
-    create_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.user.username
