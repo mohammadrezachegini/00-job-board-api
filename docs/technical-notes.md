@@ -75,6 +75,30 @@ the app's permissions again.
 
 ---
 
+### Addendum — 2026-10-21 — the race the first version did not survive
+
+Two pushes landing seconds apart (the assistant's paired journal +
+technical-notes commits) exposed a flaw: two workflow runs could overlap,
+each generating the changelog from the commit that triggered it, and the
+slower run's final `git push` was then rejected as non-fast-forward
+because the branch had moved — that run died with exit code 1. The
+changelog itself was never wrong: whichever run won regenerated it from
+the *full* history, so the file stayed complete (verified — top entry
+current after the failed run). Failure, but self-healing.
+
+Fix (workflow v2): check out the branch at its *current* head rather
+than the triggering commit, and wrap generate → commit → push in a
+retry loop that fetches, resets to the newest head, and regenerates on
+every attempt — a generated file should always be rebuilt from the
+latest state instead of merged. The same refresh moved
+`actions/checkout` to v5 (the v4 line targets the deprecated Node 20
+runtime) and pinned the runner to `ubuntu-24.04` instead of the moving
+`ubuntu-latest` label. Lesson worth an article by itself: in CI, a push
+is not the end of the world state — the branch can move under a running
+job, and jobs that commit back must be written to expect it.
+
+---
+
 ## Entry 2 — 2026-10-13 — Where the scaffold honestly stands
 
 Article value here is the *before* picture — what `django-admin
