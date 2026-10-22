@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-21 — Add custom User model with company/candidate roles; reset DB (2dc2737)
+- 2026-10-14 — docs: update changelog [skip changelog] (b7aa970)
 - 2026-10-13 — docs: technical notes entry 4 — dev Dockerfile and Compose stack (c959e7a)
 - 2026-10-14 — docs: update changelog [skip changelog] (6ff4183)
 - 2026-10-13 — docs: journal — Docker dev stack (Dockerfile + Compose/Postgres 17) (8caa514)
