@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-21 — docs: journal — changelog workflow v2 hardening (d8d151a)
+- 2026-10-22 — docs: update changelog [skip changelog] (6615217)
 - 2026-10-21 — updated changelog.yaml (be15a45)
 - 2026-10-22 — docs: update changelog [skip changelog] (e1aefa1)
 - 2026-10-21 — docs: technical notes — changelog workflow race addendum + v2 fix (2f4f0c0)
