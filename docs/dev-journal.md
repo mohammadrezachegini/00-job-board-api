@@ -52,3 +52,13 @@ This journal is updated as new work is pushed.
   it survives container restarts. Technical breakdown in
   `docs/technical-notes.md`, entry 4. Still open: the first migration
   run against the Compose PostgreSQL is not shown in these commits.
+- 2026-10-21 (commit `2dc2737`, "Add custom User model with company/candidate
+  roles; reset DB"): the accounts foundation lands. A new `jobs` app holds a
+  custom `User` model that extends Django's built-in user with a `role` field —
+  every account is either a company or a candidate — plus small `is_company` /
+  `is_candidate` helper properties for the permission checks coming later.
+  Email is now unique per account. Settings point Django at this model
+  (`AUTH_USER_MODEL`), and the database was reset with a fresh initial
+  migration, which is the standard price of swapping the user model. This is
+  the first piece of Night 4's model work; the Job and Application models are
+  still to come. Technical breakdown in `docs/technical-notes.md`, entry 5.
