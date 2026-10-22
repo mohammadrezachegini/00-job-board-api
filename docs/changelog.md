@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-21 — docs: technical notes entry 5 — custom User model with roles (a4aff09)
+- 2026-10-21 — docs: journal — custom User model with roles (3c95495)
+- 2026-10-22 — docs: update changelog [skip changelog] (167b090)
 - 2026-10-21 — Add custom User model with company/candidate roles; reset DB (2dc2737)
 - 2026-10-14 — docs: update changelog [skip changelog] (b7aa970)
 - 2026-10-13 — docs: technical notes entry 4 — dev Dockerfile and Compose stack (c959e7a)
