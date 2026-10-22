@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-21 — docs: technical notes — changelog workflow race addendum + v2 fix (2f4f0c0)
+- 2026-10-22 — docs: update changelog [skip changelog] (597acdd)
 - 2026-10-21 — docs: technical notes entry 6 — Company and CandidateProfile models (147ba3a)
 - 2026-10-21 — docs: journal — Company and CandidateProfile models (af34ee5)
 - 2026-10-22 — docs: update changelog [skip changelog] (e4fb20a)
