@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-21 — Add Company and CandidateProfile models with admin (6c728f5)
+- 2026-10-22 — docs: update changelog [skip changelog] (52ccb63)
 - 2026-10-21 — docs: technical notes entry 5 — custom User model with roles (a4aff09)
 - 2026-10-21 — docs: journal — custom User model with roles (3c95495)
 - 2026-10-22 — docs: update changelog [skip changelog] (167b090)
