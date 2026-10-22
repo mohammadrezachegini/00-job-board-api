@@ -495,3 +495,116 @@ Job and Application models (the rest of Night 4) are not in this commit yet.
 - "The reset is the lesson: what actually breaks when you swap AUTH_USER_MODEL late"
 - "TextChoices over stringly-typed code: enums that store as plain text"
 - "Unique email is not email login: USERNAME_FIELD and the half-finished auth change"
+
+---
+
+## Entry 6 — 2026-10-21 — Company & CandidateProfile: profiles done right (commit `6c728f5`)
+
+Entry 5 ended with a prediction: identity stays in one user table, and
+profile data would arrive as separate models pointing at it. This commit is
+that step, and the interesting part is *how each field earns its place*.
+
+### One-to-one profiles — `jobs/models.py`
+
+```python
+class Company(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="company"
+    )
+    ...
+
+class CandidateProfile(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="candidate_profile",
+    )
+    skills = ArrayField(models.CharField(max_length=50), default=list, blank=True)
+    ...
+```
+
+- **`OneToOneField` is a foreign key with a unique constraint** — that is
+  the whole mechanism. It guarantees at the *database* level that one user
+  has at most one company profile, which a plain `ForeignKey` cannot say.
+  The reverse accessor comes from `related_name`: `user.company` and
+  `user.candidate_profile` read naturally everywhere (serializers,
+  permission classes, templates) instead of the generated
+  `company_set`-style names a default relation would produce.
+- **Referencing `settings.AUTH_USER_MODEL`, not `User` directly** — importing
+  the concrete model into the same app's models file works, but the settings
+  reference is the swappable pattern Django recommends: if the user model
+  ever moves, every relation follows the setting instead of an import.
+- **`on_delete=models.CASCADE`** — deleting a user deletes its profile. For
+  identity-owned data that is the correct direction; the reverse (deleting
+  a profile) leaves the account intact.
+- **`blank=True` on website / description / headline / location** — optional
+  at the form/serializer layer. Note `blank` (validation) vs `null`
+  (database): these string fields correctly omit `null=True`, so empty
+  means `""`, never a mix of NULL and empty string representing the same
+  thing — a classic Django modeling trap avoided.
+
+### The two fields that are really future features in disguise
+
+- **`Company.is_verified = BooleanField(default=False)`** — default *off*
+  means a freshly registered company cannot post until someone verifies it.
+  That is precisely the state the Night 9 permission class
+  `IsVerifiedCompany` will test. A boolean default is also a small security
+  posture: the failure mode of forgetting to set it is "too restrictive",
+  never "accidentally trusted".
+- **`CandidateProfile.skills` as a PostgreSQL `ArrayField`** — this is the
+  payoff of the Night 3 database switch. Skills live as a native Postgres
+  array in a single column — no join table, no comma-separated string
+  parsing — and Postgres can query inside it (`contains`, `overlap`
+  lookups), which is exactly what Night 11's match scoring needs when it
+  compares a job's required skills against a candidate's. Details that are
+  right: the element type carries its own `max_length=50`, and
+  `default=list` passes the *callable* — writing `default=[]` would share
+  one mutable list across every row that relies on the default, one of
+  Python's most famous footguns, neatly avoided. The trade, honestly: the
+  project gives up database portability for this column — `ArrayField`
+  does not exist on SQLite/MySQL — a deliberate bet placed when Postgres
+  was chosen.
+
+### Admin that does operational work — `jobs/admin.py`
+
+- **Extending `UserAdmin`, not replacing it** — the custom class subclasses
+  Django's `UserAdmin`, so password handling, permission widgets, and the
+  change-password flow all survive. It then *appends*:
+  `list_display`/`list_filter` gain `role`, the existing `fieldsets` get a
+  "Job board" section exposing `role` on the change form, and
+  `add_fieldsets` gains `email` + `role` on the add form — which closes the
+  gap flagged in entry 5 (admin-created users previously got no role and a
+  non-unique email prompt).
+- **`CompanyAdmin.list_editable = ("is_verified",)`** — the verification
+  flag can be flipped inline from the company list, next to a
+  `list_filter` on the same field. That is an ops workflow in three lines:
+  filter to unverified companies, tick, save. `search_fields` uses
+  `user__email` — the double-underscore lookup that searches *across* the
+  relation into the user table.
+- Migration `0002_candidateprofile_company` carries both models; schema
+  and code land in the same commit, so a fresh clone migrates cleanly.
+
+### Honest gaps
+
+- **A naming typo worth fixing while it is cheap:** CandidateProfile's
+  timestamp is `create_at` while Company's is `created_at`. Inconsistent
+  field names leak into serializers, ordering clauses, and every query
+  written later; renaming it now costs one migration, renaming it after
+  the API ships costs a breaking change. (Cosmetic sibling: the admin
+  class is spelled `JobBoradUserAdmin` — harmless, but the kind of thing
+  worth catching in review.)
+- **Nothing enforces "role matches profile type" yet.** The schema allows a
+  candidate-role user to own a `Company` row and vice versa — integrity
+  rules like that belong in the registration serializers (Night 5), where
+  the role is known, or in model `clean()`; today they are simply absent,
+  which is fine as long as Night 5 remembers them.
+- **Job and Application are still missing** — they are the larger half of
+  Night 4 (foreign keys both ways, application status, the resume field
+  that Night 12 will wire to S3).
+
+### Article angles
+
+- "OneToOne is a promise the database keeps: modeling profiles in Django"
+- "Your boolean default is a security decision: default-deny with is_verified"
+- "Native Postgres arrays in Django: ArrayField, and the match-scoring door it opens"
+- "default=list, never default=[]: the mutable-default trap in a real model"
