@@ -73,3 +73,15 @@ This journal is updated as new work is pushed.
   see and set roles, and verify companies straight from the list view.
   Migration `0002` included. Remaining for Night 4: the Job and Application
   models. Technical breakdown in `docs/technical-notes.md`, entry 6.
+- 2026-10-21, later (commit `be15a45`, "updated changelog.yaml"): the
+  changelog workflow got its hardening update. That evening's paired doc
+  pushes had exposed a race in version 1 — two runs overlapping, one dying
+  with exit code 1 when its push was rejected because the branch had moved
+  (the changelog itself stayed correct, since the winning run rebuilds it
+  from the full history). Version 2, pushed by the repo owner, checks out
+  the branch at its current head and retries generate-commit-push up to
+  three times from the newest head, moves to `actions/checkout@v5` (the v4
+  line rides the deprecated Node 20 runtime), and pins the runner to
+  Ubuntu 24.04 instead of the moving `ubuntu-latest` label. First run
+  under v2 landed the bot's changelog commit about 18 seconds after the
+  push. Full diagnosis in `docs/technical-notes.md`, entry 1 addendum.
