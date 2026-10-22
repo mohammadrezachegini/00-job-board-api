@@ -85,3 +85,11 @@ This journal is updated as new work is pushed.
   Ubuntu 24.04 instead of the moving `ubuntu-latest` label. First run
   under v2 landed the bot's changelog commit about 18 seconds after the
   push. Full diagnosis in `docs/technical-notes.md`, entry 1 addendum.
+- 2026-10-21, minutes later (commit `289e2e5`, "Fix soem typos"): the
+  `create_at` typo on CandidateProfile is renamed to `created_at` in the
+  model, matching Company. Caught in review the same night: the rename
+  migration has not been generated yet — migration `0002` still defines
+  `create_at`, so model and database schema are temporarily out of sync
+  until `makemigrations` (answering yes to the rename prompt, so it becomes
+  a data-preserving RenameField) and `migrate` are run and pushed. The
+  cosmetic `JobBoradUserAdmin` class-name typo in admin.py was left as is.
