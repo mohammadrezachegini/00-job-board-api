@@ -389,3 +389,109 @@ volumes:
 - "The `$$` that saves your healthcheck: escaping variable interpolation in Compose files"
 - "Put the venv outside the code: how `UV_PROJECT_ENVIRONMENT=/opt/venv` makes bind mounts and uv play nicely"
 - "Copy the lockfile first: Docker layer caching is a dependency-management decision"
+
+---
+
+## Entry 5 — 2026-10-21 — A custom User model with roles (commit `2dc2737`)
+
+### Why a custom user model at all — and why now
+
+Django's single most repeated piece of advice: **create a custom user model
+at the start of the project, even if it behaves identically to the built-in
+one.** The reason is asymmetry of cost. Pointing Django at your own model on
+day one is two lines. Swapping it later — after migrations have run and other
+models have foreign keys to the user — means resetting the database and
+regenerating migrations, because every reference to the user model is baked
+into migration history. This commit pays that reset *now*, while the database
+holds nothing worth keeping (and its message says so: "reset DB"), so the
+project never has to pay it with real data in the tables.
+
+### The code — `jobs/models.py`
+
+```python
+class User(AbstractUser):
+    class Role(models.TextChoices):
+        COMPANY = "company", "Company"
+        CANDIDATE = "candidate", "Candidate"
+
+    email = models.EmailField(unique=True)
+    role = models.CharField(max_length=20, choices=Role.choices)
+
+    @property
+    def is_company(self):
+        return self.role == self.Role.COMPANY
+
+    @property
+    def is_candidate(self):
+        return self.role == self.Role.CANDIDATE
+```
+
+- **`AbstractUser`, not `AbstractBaseUser`** — subclassing `AbstractUser`
+  inherits the complete built-in user (username, password hashing, staff /
+  active flags, groups and permissions machinery, the default manager) and
+  lets you *add* fields. `AbstractBaseUser` is the bare-password-only base
+  you pick when you want to rebuild everything, including the manager and
+  auth plumbing. For this API, extension beats reinvention.
+- **The wiring is two places** — `AUTH_USER_MODEL = 'jobs.User'` in settings
+  (note the format is `app_label.ModelName`, not an import path) and `"jobs"`
+  in `INSTALLED_APPS`. From then on Django itself treats `jobs.User` as *the*
+  user everywhere: `request.user`, foreign keys via
+  `settings.AUTH_USER_MODEL`, the admin, and migrations — which is why the
+  generated `0001_initial.py` for the jobs app contains the whole user table
+  (it depends on `auth` app migration `0012`, since groups/permissions live
+  there) and this model becomes the swappable target other apps will point at.
+- **`Role` as `models.TextChoices`** — a typed enumeration nested in the
+  model. It stores plain strings (`"company"`) in a regular varchar column —
+  no database enum type — while code refers to `User.Role.COMPANY` instead of
+  scattering the raw string `"company"` through views and permission classes,
+  where a typo would silently never match. The second element of each tuple
+  is the human-readable label Django uses in forms and admin. Validation
+  note: `choices` is enforced by forms/serializers and `full_clean()`, *not*
+  by a database constraint — the column itself will accept any string, so API
+  input must be validated at the serializer layer (which is where the
+  register endpoints in Night 5 will do it).
+- **`email` overridden as `unique=True`** — the stock `AbstractUser` email
+  field is *not* unique; two accounts could share one address. Overriding
+  the field in the subclass is enough — the migration shows the unique
+  constraint landing in the schema.
+- **`is_company` / `is_candidate` as `@property`** — call sites read
+  `user.is_company` (no parentheses, no string comparison) and take no extra
+  query, because `role` travels with the already-fetched user row. These two
+  properties are the seam the Night 9–10 permission classes
+  (`IsVerifiedCompany`, `IsCandidate`, …) will hang off: the rule "companies
+  post jobs" becomes a readable boolean instead of string matching repeated
+  across views.
+
+### Design call — one User with a role, not separate user types
+
+The project brief sketches Company and CandidateProfile as models of their
+own. This commit chooses the common alternative for *identity*: a single
+user table with a role discriminator, because authentication, tokens, and
+permissions all operate on one principal. It does not close the door on
+profiles — the natural next step is `OneToOne` profile models pointing at
+this user when company/candidate-specific fields appear (company name,
+skills, resume), which keeps identity unified and profile data separate.
+Job and Application models (the rest of Night 4) are not in this commit yet.
+
+### Honest gaps — worth knowing before Night 5 builds on this
+
+- **Login is still by username, not email.** Making `email` unique does not
+  change `USERNAME_FIELD` (still `"username"` on `AbstractUser`). If the API
+  should authenticate by email, that is a deliberate extra step:
+  `USERNAME_FIELD = "email"`, removing/relaxing `username`, and a custom
+  user manager — best decided *before* the JWT endpoints land in Night 5.
+- **`role` has no default and is not in `REQUIRED_FIELDS`.** Code paths that
+  create users must always pass a role explicitly; in particular
+  `createsuperuser` does not know about `role`, so a superuser created
+  today ends up with an empty role unless `REQUIRED_FIELDS` is extended —
+  harmless for an admin account, confusing if forgotten.
+- **The commented-out scaffold block is still at the top of
+  `settings.py`** (including the old insecure key string) — flagged in
+  entry 3, still worth deleting before a scanner ever runs on this repo.
+
+### Article angles
+
+- "Do it on day one: why Django begs you to subclass the user model before your first migration"
+- "The reset is the lesson: what actually breaks when you swap AUTH_USER_MODEL late"
+- "TextChoices over stringly-typed code: enums that store as plain text"
+- "Unique email is not email login: USERNAME_FIELD and the half-finished auth change"
