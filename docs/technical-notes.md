@@ -626,6 +626,15 @@ class CandidateProfile(models.Model):
   Night 4 (foreign keys both ways, application status, the resume field
   that Night 12 will wire to S3).
 
+- **Correction (same night, commit `289e2e5`):** the `create_at` typo was
+  renamed to `created_at` in the model — but the commit contains no rename
+  migration, and `0002` still creates the column as `create_at`. Until a
+  `RenameField` migration is generated (makemigrations asks "did you
+  rename…?" — answering yes preserves the column and its data; remove+add
+  would drop it) and applied, the model and the schema disagree and any
+  CandidateProfile query fails against the real column name. A rename is
+  only finished when the migration lands in the same state as the code.
+
 ### Article angles
 
 - "OneToOne is a promise the database keeps: modeling profiles in Django"
