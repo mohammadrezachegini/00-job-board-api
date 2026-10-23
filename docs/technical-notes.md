@@ -635,6 +635,17 @@ class CandidateProfile(models.Model):
   CandidateProfile query fails against the real column name. A rename is
   only finished when the migration lands in the same state as the code.
 
+- **Follow-up (2026-10-22, commit `21bf705`):** the rename migration did
+  land — `0003_rename_create_at_candidateprofile_created_at` is a single
+  `RenameField` operation depending on `0002`, exactly the
+  data-preserving outcome described above, and the drift is closed. The
+  same commit is also a documentation lesson: its message claims Job and
+  Application models that the diff does not contain. A changelog
+  generated from commit messages (entry 1) inherits the accuracy of the
+  messages — it is a mirror, not a fact-checker — so the permanent
+  history now mis-describes this commit. Write messages from `git diff
+  --staged`, not from the task you meant to do.
+
 ### Article angles
 
 - "OneToOne is a promise the database keeps: modeling profiles in Django"
