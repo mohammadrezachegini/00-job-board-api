@@ -23,7 +23,9 @@ class User(AbstractUser):
 
 class Company(models.Model):
     user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="company"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="company",
     )
     name = models.CharField(max_length=255)
     website = models.URLField(blank=True)
