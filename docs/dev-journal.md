@@ -106,3 +106,14 @@ This journal is updated as new work is pushed.
   changelog copies commit messages verbatim, so it now credits this
   commit with work it does not contain — one more reason messages are
   written from the diff, not from the plan.
+- 2026-10-22 (commit `82f3a42`, "Add JWT auth (SimpleJWT)"): authentication
+  plumbing lands — the first half of Night 5. SimpleJWT is added as a
+  dependency, DRF is configured to authenticate with JWTs and to require
+  authentication by default, and the token endpoints are live at
+  `POST /api/auth/token/` and `POST /api/auth/token/refresh/` (access
+  tokens live 15 minutes, refresh tokens 1 day), matching the project
+  brief's API layout. Still missing for Night 5: the
+  `register/company/` and `register/candidate/` endpoints — there are no
+  views or serializers yet. And Night 4's Job and Application models are
+  still outstanding; tonight's work jumped ahead to auth. Technical
+  breakdown in `docs/technical-notes.md`, entry 7.
