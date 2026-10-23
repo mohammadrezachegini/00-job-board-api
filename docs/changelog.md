@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-22 — Add JWT auth (SimpleJWT): token and refresh endpoints, IsAuthenticated by default (82f3a42)
+- 2026-10-23 — docs: update changelog [skip changelog] (662ce04)
 - 2026-10-23 — docs: update changelog [skip changelog] (dd6b853)
 - 2026-10-22 — docs: technical notes — entry 6 follow-up (rename landed; message-vs-diff lesson) (165edb0)
 - 2026-10-22 — docs: journal — rename migration landed; Job/Application still outstanding (74a1d0a)
