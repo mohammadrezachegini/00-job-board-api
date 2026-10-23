@@ -652,3 +652,95 @@ class CandidateProfile(models.Model):
 - "Your boolean default is a security decision: default-deny with is_verified"
 - "Native Postgres arrays in Django: ArrayField, and the match-scoring door it opens"
 - "default=list, never default=[]: the mutable-default trap in a real model"
+
+---
+
+## Entry 7 — 2026-10-22 — JWT auth with SimpleJWT (commit `82f3a42`)
+
+### What a JWT setup actually consists of
+
+Three pieces in this commit, each in its natural place:
+
+```python
+# config/settings.py
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+}
+
+# jobs/urls.py, mounted at api/ in config/urls.py
+path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+```
+
+- **The token model** — a JWT is a *signed, self-contained* credential:
+  header, payload (claims like `user_id`, `token_type`, `exp`), and a
+  signature made with the server's secret (here Django's `SECRET_KEY` —
+  the env-var one from entry 3, so the fail-fast secret discipline turns
+  out to be load-bearing for auth too). The server stores **no session**:
+  any instance can verify any token by checking the signature and expiry,
+  which is exactly why tokens suit an API that will later run as multiple
+  containers behind Kubernetes — no shared session store to keep in sync.
+- **Two tokens, two jobs** — the *access* token (15 minutes) is the one
+  sent on every request as `Authorization: Bearer <token>`; short life
+  limits the damage if it leaks, because it cannot be revoked — a signed
+  JWT is valid until it expires, server amnesia cuts both ways. The
+  *refresh* token (1 day) does one thing: obtain a fresh access token
+  from the refresh endpoint without re-entering credentials. The client
+  guards the refresh token like a password.
+- **`JWTAuthentication` as the default authentication class** — DRF runs
+  it on every request: parse the header, verify signature/expiry, load
+  the user named by the token's `user_id` claim. Because the project
+  swapped `AUTH_USER_MODEL` (entry 5), that lookup resolves to
+  `jobs.User` automatically — the earlier foundation paying off with zero
+  extra wiring. Note what SimpleJWT did **not** need:
+  `rest_framework_simplejwt` is absent from `INSTALLED_APPS`, and that is
+  correct — the app is only required for the optional token-blacklist
+  feature; the obtain/refresh views and authentication class work from
+  the dependency alone.
+- **`IsAuthenticated` as the default permission** — the security posture
+  flips from the framework default: instead of "open unless a view
+  protects itself", every future endpoint requires a logged-in user
+  unless it explicitly opts out (`AllowAny`). Deny-by-default means a
+  forgotten permission declaration fails *closed* (a 401 for everyone)
+  rather than open (the whole internet) — the same default-deny instinct
+  as `is_verified = False` in entry 6. The register endpoints, when they
+  land, will be the deliberate exception.
+- **The obtain view authenticates by `USERNAME_FIELD`** — still
+  `username` on this user model (see entry 5's open question). The token
+  endpoints therefore take username + password today; switching login to
+  email is still possible, still cheaper now than after clients exist.
+
+### Honest gaps
+
+- **Night 5 is half done.** Token obtain/refresh exist; the register
+  endpoints from the brief (`register/company/`, `register/candidate/`)
+  do not — no serializers or views have been written (`jobs/views.py` is
+  still the stock stub). Registration is also where the role ↔ profile
+  integrity rules flagged in entry 6 (a company-role user gets a Company
+  row, a candidate gets a CandidateProfile) must be enforced.
+- **No refresh rotation or blacklist.** With SimpleJWT defaults, the
+  same refresh token is reusable for its whole 1-day life; a stolen one
+  is a 1-day skeleton key. `ROTATE_REFRESH_TOKENS` + the blacklist app is
+  the standard hardening and a natural later entry.
+- **Nothing proves it end-to-end yet** — no test or recorded call shows a
+  token being obtained and used against a protected endpoint. The
+  Night 8 smoke test is where that proof belongs.
+- **Night 4 is still open** — Job and Application models remain unwritten;
+  auth was built ahead of them. Register endpoints can proceed (the
+  profile models exist), but Night 6's job CRUD has nothing to stand on
+  until the Job model lands.
+
+### Article angles
+
+- "Sessions don't scale, signatures do: why APIs authenticate with JWTs"
+- "Access vs refresh: the two-token pattern and the 15-minute compromise"
+- "Default-deny in DRF: one settings line that fails closed"
+- "Your SECRET_KEY is now your auth infrastructure: env discipline meets JWT signing"
