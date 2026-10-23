@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-22 — Add Job and Application models with unique-application constraint (21bf705)
+- 2026-10-22 — docs: update changelog [skip changelog] (265e90c)
 - 2026-10-21 — docs: technical notes — entry 6 correction (rename migration pending) (27ac601)
 - 2026-10-22 — docs: update changelog [skip changelog] (710d01b)
 - 2026-10-21 — docs: journal — typo rename, migration pending (f6ef643)
