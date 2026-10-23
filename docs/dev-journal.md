@@ -93,3 +93,16 @@ This journal is updated as new work is pushed.
   until `makemigrations` (answering yes to the rename prompt, so it becomes
   a data-preserving RenameField) and `migrate` are run and pushed. The
   cosmetic `JobBoradUserAdmin` class-name typo in admin.py was left as is.
+- 2026-10-22 (commit `21bf705`): the missing rename migration lands —
+  `0003_rename_create_at_candidateprofile_created_at`, a data-preserving
+  `RenameField`. Model and schema are back in sync and the typo fix from
+  the night before is now genuinely complete. Recorded honestly: the
+  commit message says "Add Job and Application models with
+  unique-application constraint", but the commit contains only the rename
+  migration — verified by reading the tree: no Job or Application model
+  exists in the repo yet, and no unique constraint. Those models are
+  presumably still local or yet to be written; Night 4 remains open on
+  exactly that piece. Side effect worth knowing: the auto-generated
+  changelog copies commit messages verbatim, so it now credits this
+  commit with work it does not contain — one more reason messages are
+  written from the diff, not from the plan.
