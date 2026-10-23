@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-22 — docs: technical notes — entry 6 follow-up (rename landed; message-vs-diff lesson) (165edb0)
+- 2026-10-22 — docs: journal — rename migration landed; Job/Application still outstanding (74a1d0a)
+- 2026-10-23 — docs: update changelog [skip changelog] (5671b27)
 - 2026-10-22 — Add Job and Application models with unique-application constraint (21bf705)
 - 2026-10-22 — docs: update changelog [skip changelog] (265e90c)
 - 2026-10-21 — docs: technical notes — entry 6 correction (rename migration pending) (27ac601)
