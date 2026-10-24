@@ -54,3 +54,57 @@ class CandidateProfile(models.Model):
 
     def __str__(self):
         return self.user.username
+
+
+class Job(models.Model):
+
+    class JobType(models.TextChoices):
+        FULL_TIME = "full_time", "Full-time"
+        PART_TIME = "part_time", "Part-time"
+        CONTRACT = "contract", "Contract"
+        INTERNSHIP = "internship", "Internship"
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="jobs")
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    location = models.CharField(max_length=100)
+    job_type = models.CharField(
+        max_length=20, choices=JobType.choices, default=JobType.FULL_TIME
+    )
+    required_skills = ArrayField(
+        models.CharField(max_length=50), default=list, blank=True
+    )
+    is_open = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} ({self.company})"
+
+
+class Application(models.Model):
+    class Status(models.TextChoices):
+        SUBMITTED = "submitted", "Submitted"
+        REVIEWING = "reviewing", "Reviewing"
+        INTERVIEW = "interview", "Interview"
+        OFFERED = "offered", "Offered"
+        REJECTED = "rejected", "Rejected"
+
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="applications")
+    candidate = models.ForeignKey(CandidateProfile, on_delete=models.CASCADE, related_name="applications")
+    cover_letter = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SUBMITTED)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["job", "candidate"], name="unique_application_per_job"),
+        ]
+
+    def __str__(self):
+        return f"{self.candidate} -> {self.job}"

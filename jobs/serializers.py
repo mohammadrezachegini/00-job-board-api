@@ -3,7 +3,7 @@ from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.db import transaction
 from rest_framework import serializers
 
-from .models import CandidateProfile, Company
+from .models import CandidateProfile, Company, Job
 
 User = get_user_model()
 
@@ -73,3 +73,5 @@ class CandidateRegistrationSerializer(BaseRegistrationSerializer):
         user = self.create_user(validated_data, role=User.Role.CANDIDATE)
         CandidateProfile.objects.create(user=user, **validated_data)
         return user
+    
+
