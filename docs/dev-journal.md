@@ -139,3 +139,15 @@ This journal is updated as new work is pushed.
   whole foundation stretch — settings, Docker, models, auth,
   registration — is done, and Night 6's job CRUD has its model to stand
   on. Technical breakdown in `docs/technical-notes.md`, entry 9.
+- 2026-10-23 (commit `cdb8ae2`, "Add job endpoints"): Night 6's job
+  endpoints are built — `GET /api/jobs/` (open jobs only, paginated 20
+  per page), job detail, company-only creation (the company is taken
+  from the login token, never from the request body), and updates. There
+  is deliberately no delete: closing a job is a state change, not an
+  erasure. Review found three things to harden, detailed in the
+  technical notes: a wrong exception type turns the "companies only"
+  rejection into a 500 instead of a 403; updates don't yet check that
+  the job belongs to the caller's company; and the brief's dedicated
+  close action (`POST /jobs/{id}/close/`) plus public browsing aren't in
+  yet — those sit naturally with Night 9's permissions work.
+  Technical breakdown in `docs/technical-notes.md`, entry 10.
