@@ -744,3 +744,104 @@ path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 - "Access vs refresh: the two-token pattern and the 15-minute compromise"
 - "Default-deny in DRF: one settings line that fails closed"
 - "Your SECRET_KEY is now your auth infrastructure: env discipline meets JWT signing"
+
+---
+
+## Entry 8 — 2026-10-23 — Registration endpoints (commit `f9b17a0`)
+
+### One base serializer, two doors
+
+Registration is split by role at the URL level — `auth/register/company/`
+and `auth/register/candidate/` — with a shared
+`BaseRegistrationSerializer` (a plain `serializers.Serializer`, not a
+ModelSerializer, because the input spans two models) carrying the common
+contract, and one subclass per role adding only its profile fields:
+
+```python
+class BaseRegistrationSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150, validators=[UnicodeUsernameValidator()])
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    ...
+    def validate_email(self, value):
+        value = value.lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("An account with this email already exists.")
+        return value
+```
+
+Details worth stealing:
+
+- **The role is assigned by the server, never taken from the request.**
+  `role` is not a serializer field at all — each subclass's `create()`
+  passes `role=User.Role.COMPANY` / `CANDIDATE` itself. This closes the
+  classic mass-assignment escalation: there is no payload a client can
+  send that makes it anything other than the role of the door it walked
+  through, and `is_staff` / `is_verified` are equally unreachable.
+- **Email uniqueness is enforced twice, correctly.** PostgreSQL's unique
+  constraint on the email column is case-*sensitive*, so
+  `Alice@x.com` and `alice@x.com` would both satisfy the database.
+  The serializer closes the gap: it lowercases the address and checks
+  `email__iexact`. Because every stored address is normalized to
+  lowercase at this single entry point, the DB constraint becomes
+  effectively case-insensitive behind it. Username gets the same
+  `__iexact` treatment.
+- **Passwords go through Django's validators**
+  (`password_validation.validate_password` in `validate_password`), so
+  the project's `AUTH_PASSWORD_VALIDATORS` — length, common-password,
+  numeric-only, similarity — apply to API signups exactly as they do in
+  the admin. The field is `write_only` and `trim_whitespace=False`
+  (trailing spaces are legal password characters; silently trimming them
+  would store a different password than the user typed). Creation goes
+  through `User.objects.create_user`, so hashing is Django's, never
+  hand-rolled.
+- **User + profile creation is `@transaction.atomic`.** A registration
+  writes two rows that must exist together or not at all; if profile
+  creation fails, the user row rolls back instead of leaving an
+  account with no profile that would fail every subsequent request in
+  confusing ways. All-or-nothing is the only sensible shape for a
+  two-row invariant.
+- **The deliberate exception to entry 7's default-deny.** Both views are
+  `CreateAPIView`s with `permission_classes = [AllowAny]` *and*
+  `authentication_classes = []`. The second line is the subtle one:
+  without it, a request carrying a stale/invalid Bearer token would be
+  rejected by the global `JWTAuthentication` before the view ever ran —
+  a logged-out-in-spirit user couldn't re-register because their old
+  token is malformed. Empty authentication classes mean "don't even try
+  to authenticate here", which is what a public signup endpoint wants.
+- **The response is a whitelist.** `to_representation` returns only
+  `id`, `username`, `email`, `role` — the password cannot leak through
+  the serializer's output because it is never in it.
+
+### Pitfalls found in review (small, real)
+
+- **Length mismatches between serializer and model.** The serializer
+  accepts `location` up to 200 chars but the model column is
+  `varchar(100)`, and `skills` entries up to 100 chars against a
+  `varchar(50)` array element. Values in the gap pass validation, then
+  fail at the database with a `DataError` — a 500 where a 400 belongs.
+  Fix: align the serializer to the model (`location` 100, skills child
+  50). Rule of thumb: serializer limits should never exceed the column
+  they feed.
+- **`validate_email(delf, value)`** — a typo'd first parameter name.
+  Harmless (Python passes the instance positionally, whatever it's
+  called, and the body never uses it), but it will confuse every future
+  reader; it should be `self`.
+- The uniqueness pre-checks are inherently racy (check-then-create is
+  never atomic by itself) — acceptable here because the database unique
+  constraints are the real backstop, with the checks existing to produce
+  friendly 400s instead of raw integrity errors.
+
+### Status
+
+Night 5 is complete per the brief: JWT config, token + refresh endpoints,
+and both registration endpoints. Night 4's Job and Application models
+remain the one open foundation item — and Night 6's job CRUD needs the
+Job model, so they are the natural next session.
+
+### Article angles
+
+- "Never let the client pick its own role: registration design against mass-assignment"
+- "Case-insensitive email uniqueness: why the DB constraint alone is not enough"
+- "Two rows or none: @transaction.atomic and the user+profile invariant"
+- "Serializer vs model validation: the 500 hiding in a length mismatch"
