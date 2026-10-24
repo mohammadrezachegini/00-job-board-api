@@ -2,6 +2,7 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-24 — docs: update changelog [skip changelog] (9cb073e)
 - 2026-10-23 — docs: technical notes entry 10 — job endpoints (66c91e8)
 - 2026-10-23 — docs: journal — job endpoints (Night 6) with hardening notes (d5d4ca6)
 - 2026-10-24 — docs: update changelog [skip changelog] (5f001f0)
