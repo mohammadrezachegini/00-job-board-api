@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-23 — docs: journal — registration endpoints complete Night 5 (462c05a)
+- 2026-10-24 — docs: update changelog [skip changelog] (907b9dd)
 - 2026-10-23 — Add company and candidate registration endpoints (atomic user + profile create) (f9b17a0)
 - 2026-10-23 — docs: update changelog [skip changelog] (4841c78)
 - 2026-10-22 — docs: technical notes entry 7 — JWT auth with SimpleJWT (1ae4486)
