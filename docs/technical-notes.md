@@ -943,3 +943,94 @@ entries have been quietly preparing flags for.
 - "Model the actor, not the account: why Application points at the profile"
 - "Status machines with TextChoices: naming the pipeline honestly"
 - "list_select_related: killing the admin's N+1 before it starts"
+
+---
+
+## Entry 10 — 2026-10-23 — Job endpoints (commit `cdb8ae2`)
+
+### A ViewSet assembled from mixins — including what was left out
+
+```python
+class JobViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = JobSerializer
+
+    def get_queryset(self):
+        queryset = Job.objects.select_related("company")
+        if self.action == "list":
+            queryset = queryset.filter(is_open=True)
+        return queryset
+
+    def perform_create(self, serializer):
+        if not self.request.user.is_company:
+            raise PermissionError("Only company users can create jobs.")
+        serializer.save(company=self.request.user.company)
+```
+
+- **The missing mixin is the design.** There is no
+  `DestroyModelMixin`, so no DELETE route exists at all. Jobs are never
+  erased — they are closed (`is_open=False`), preserving applications
+  and history (entry 9). You cannot call an endpoint that was never
+  built; absence beats a permission check.
+- **Action-aware querysets.** `get_queryset` filters `is_open=True`
+  only for `list` — the public catalogue shows open jobs, while
+  `retrieve` can still fetch a closed job by id (a candidate reviewing a
+  job they applied to needs exactly that). `select_related("company")`
+  rides along so list rendering doesn't N+1.
+- **The company comes from the token, never the payload.** The
+  serializer exposes `company` as a read-only field flattened to the
+  company's *name*, and `perform_create` injects
+  `request.user.company` server-side. A client literally cannot post a
+  job as someone else — there is no writable field to attack (the
+  registration lesson from entry 8, applied again).
+- **Pagination is global**: `PageNumberPagination` with `PAGE_SIZE=20`
+  in `REST_FRAMEWORK` — every future list endpoint inherits it.
+
+### Three findings from review (ordered by severity)
+
+1. **Wrong exception type → 500 instead of 403.** `perform_create`
+   raises Python's builtin `PermissionError`. DRF's exception handler
+   translates `rest_framework.exceptions.PermissionDenied`, Django's
+   `PermissionDenied`, and `Http404` — the builtin is none of those, so
+   it escapes as an unhandled error: a candidate posting a job receives
+   a 500 stack trace, not a clean 403. One-line fix: raise DRF's
+   `PermissionDenied`. (The deeper fix is a permission class — Night
+   9's `IsCompany` — so the check runs before the view, declaratively.)
+2. **Update has no ownership check.** For `update`/`partial_update` the
+   queryset is unscoped and there is no object permission, so *any*
+   authenticated user — a candidate, or a rival company — can PATCH any
+   job: retitle it, rewrite it, or close it via `is_open`. Tonight this
+   is the one real authorization hole in the API. Fixes, either layer:
+   scope the queryset for write actions to
+   `company__user=self.request.user`, or add a `has_object_permission`
+   ownership class (again, Night 9 territory — but this one shouldn't
+   wait for a public deployment).
+3. **Brief deviations, both plausibly deliberate:** browsing requires
+   authentication (the global `IsAuthenticated` default), while the
+   brief specifies a public job list; and there is no dedicated
+   `POST /jobs/{id}/close/` `@action` — closing currently happens by
+   PATCHing `is_open`, which works but is less explicit than the
+   brief's verb-style endpoint and inherits finding 2's hole.
+   Edge case in the same area: a company-role user with no Company
+   profile (e.g. created in the admin) hits
+   `RelatedObjectDoesNotExist` in `perform_create` — another 500
+   instead of a 4xx.
+
+### Status
+
+Night 6 is built and functional for the happy paths; the hardening
+above (403 fix, ownership, close action, public browse decision) pairs
+naturally with Night 9's custom permissions, where `IsCompany` and
+`IsVerifiedCompany` will move these checks out of the view entirely.
+
+### Article angles
+
+- "The endpoint that doesn't exist can't be abused: designing by omission"
+- "PermissionError is not PermissionDenied: DRF's exception handler, precisely"
+- "perform_create and the server-side injection pattern"
+- "Why your list endpoint and your detail endpoint want different querysets"
