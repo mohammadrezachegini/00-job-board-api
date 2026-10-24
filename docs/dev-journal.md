@@ -117,3 +117,15 @@ This journal is updated as new work is pushed.
   views or serializers yet. And Night 4's Job and Application models are
   still outstanding; tonight's work jumped ahead to auth. Technical
   breakdown in `docs/technical-notes.md`, entry 7.
+- 2026-10-23 (commit `f9b17a0`, "Add company and candidate registration
+  endpoints"): Night 5 is complete. `POST /api/auth/register/company/`
+  and `POST /api/auth/register/candidate/` are live. Both share a base
+  registration serializer (username/email/password with proper
+  validation), the server assigns the role itself — a client cannot
+  choose or escalate its own role — and user + profile are created in a
+  single database transaction, so a failed registration leaves nothing
+  half-written. Two small mismatches to fix later, noted in the technical
+  notes: the serializer accepts longer `location` and `skills` values
+  than the database columns allow. Only Night 4's Job and Application
+  models remain from the foundation stretch. Technical breakdown in
+  `docs/technical-notes.md`, entry 8.
