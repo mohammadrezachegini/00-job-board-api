@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-23 — Add Job and Application models with unique-application constraint (05f4cbc)
+- 2026-10-24 — docs: update changelog [skip changelog] (1a61097)
 - 2026-10-23 — docs: technical notes entry 8 — registration endpoints (e9c0a69)
 - 2026-10-24 — docs: update changelog [skip changelog] (af0d78a)
 - 2026-10-23 — docs: journal — registration endpoints complete Night 5 (462c05a)
