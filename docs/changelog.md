@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-23 — Add job endpoints: list open, detail, create (company only), update; pagination (cdb8ae2)
+- 2026-10-24 — docs: update changelog [skip changelog] (14a94a0)
 - 2026-10-24 — docs: update changelog [skip changelog] (2e927f8)
 - 2026-10-23 — docs: technical notes entry 9 — Job and Application models (bdaaf45)
 - 2026-10-23 — docs: journal — Job and Application models complete Night 4 (bddc6f3)
