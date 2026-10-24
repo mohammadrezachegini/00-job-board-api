@@ -845,3 +845,101 @@ Job model, so they are the natural next session.
 - "Case-insensitive email uniqueness: why the DB constraint alone is not enough"
 - "Two rows or none: @transaction.atomic and the user+profile invariant"
 - "Serializer vs model validation: the 500 hiding in a length mismatch"
+
+---
+
+## Entry 9 — 2026-10-23 — Job and Application models (commit `05f4cbc`)
+
+### The last two models, and the shape of the domain
+
+```python
+class Job(models.Model):
+    class JobType(models.TextChoices):
+        FULL_TIME = "full_time", "Full-time"
+        PART_TIME = "part_time", "Part-time"
+        CONTRACT = "contract", "Contract"
+        INTERNSHIP = "internship", "Internship"
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="jobs")
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    location = models.CharField(max_length=100)
+    job_type = models.CharField(max_length=20, choices=JobType.choices, default=JobType.FULL_TIME)
+    required_skills = ArrayField(models.CharField(max_length=50), default=list, blank=True)
+    is_open = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+class Application(models.Model):
+    class Status(models.TextChoices):
+        SUBMITTED = "submitted", "Submitted"
+        REVIEWING = "reviewing", "Reviewing"
+        INTERVIEW = "interview", "Interview"
+        OFFERED = "offered", "Offered"
+        REJECTED = "rejected", "Rejected"
+
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="applications")
+    candidate = models.ForeignKey(CandidateProfile, on_delete=models.CASCADE, related_name="applications")
+    cover_letter = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SUBMITTED)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["job", "candidate"], name="unique_application_per_job"),
+        ]
+```
+
+Decisions that matter:
+
+- **The unique constraint lives in the database, not in code.**
+  `UniqueConstraint(fields=["job", "candidate"])` makes "one application
+  per candidate per job" a property of the data itself. An application
+  check (`if exists: error`) would be racy — two concurrent requests can
+  both pass the check and both insert. A DB constraint cannot be raced;
+  the second insert simply fails. Put invariants in the layer that can
+  actually guarantee them: validation produces friendly errors,
+  constraints produce truth.
+- **`Application.candidate` points at CandidateProfile, not User.** An
+  application is something a *candidate profile* does; pointing at the
+  profile makes non-candidate applications structurally impossible
+  rather than merely checked-for, and it puts `candidate.skills` one hop
+  away for Night 11's match scoring (`job.required_skills` vs
+  `application.candidate.skills` — both `ArrayField(CharField(50))`, the
+  symmetry is deliberate and consistent, unlike the registration
+  serializer's 100-char skills slip noted in entry 8).
+- **Status as `TextChoices` with a naming refinement.** The pipeline
+  values are `submitted/reviewing/interview/offered/rejected` — the
+  brief's `applied` became `submitted` and `hired` became `offered`,
+  which is arguably the more precise word (an offer precedes a hire;
+  the company controls the offer, not the acceptance). Stored values
+  stay stable, labels stay human.
+- **`is_open` as a boolean flag, defaulting True.** Closing a job is a
+  state change, not a deletion — applications and history survive a
+  closed job, and Night 6's close action and "companies act only on
+  their own jobs" rules key off this flag plus ownership.
+- **CASCADE everywhere, consistently.** Delete a company and its jobs
+  and their applications go with it; the domain has no orphaned
+  postings. Both models order by `-created_at` (newest first is the
+  only order any list in this product will want) and carry full
+  `created_at`/`updated_at` timestamps.
+- **Admin with `list_select_related`.** Both new admins prefetch their
+  relations (`company`, `job__company`, `candidate__user`), so the
+  changelist doesn't fire a query per row — the N+1 trap avoided in the
+  one place developers usually forget it. Search crosses relations too
+  (`company__name`, `candidate__user__username`).
+
+### Status
+
+Migration `0004_job_application` completes a clean four-migration
+chain. **Night 4 is complete, and with it the foundation stretch
+(Nights 3–5) is done**: models, auth, and registration all in place.
+Next is Night 6 — Job CRUD endpoints, where these models meet the
+permissions work (`IsCompany`, `IsVerifiedCompany`) that the earlier
+entries have been quietly preparing flags for.
+
+### Article angles
+
+- "Database constraints are the only validation that can't be raced"
+- "Model the actor, not the account: why Application points at the profile"
+- "Status machines with TextChoices: naming the pipeline honestly"
+- "list_select_related: killing the admin's N+1 before it starts"
