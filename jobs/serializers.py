@@ -75,3 +75,21 @@ class CandidateRegistrationSerializer(BaseRegistrationSerializer):
         return user
     
 
+class JobSerializer(serializers.ModelSerializer):
+    company = serializers.CharField(source="company.name", read_only=True)
+
+    class Meta:
+        model = Job
+        fields = [
+            "id",
+            "company",
+            "title",
+            "description",
+            "location",
+            "job_type",
+            "required_skills",
+            "is_open",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
