@@ -129,3 +129,13 @@ This journal is updated as new work is pushed.
   than the database columns allow. Only Night 4's Job and Application
   models remain from the foundation stretch. Technical breakdown in
   `docs/technical-notes.md`, entry 8.
+- 2026-10-23 (commit `05f4cbc`, "Add Job and Application models with
+  unique-application constraint" — the title is accurate this time):
+  Night 4 is complete. The Job model (company, title, description,
+  location, job type, required skills, open flag) and the Application
+  model (job, candidate, cover letter, status pipeline) are in, with
+  migration `0004`, admin screens for both, and the database-level rule
+  that a candidate can apply to the same job only once. With this, the
+  whole foundation stretch — settings, Docker, models, auth,
+  registration — is done, and Night 6's job CRUD has its model to stand
+  on. Technical breakdown in `docs/technical-notes.md`, entry 9.
