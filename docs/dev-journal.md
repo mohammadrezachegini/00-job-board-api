@@ -166,3 +166,16 @@ This journal is updated as new work is pushed.
   sensitive); and two small serializer mismatches from entry 8 remain
   unfixed despite the commit title mentioning typos.
   Technical breakdown in `docs/technical-notes.md`, entry 11.
+- 2026-10-24 (commits `c23809b` + `1f47139`, "Add Phase 1 README"): the
+  repo gets a proper README — architecture diagram, endpoint table, setup
+  instructions, environment variable reference, design decisions, and a
+  "What Broke and How I Fixed It" section. Just as important, the README
+  records that Phase 1 was verified with a real end-to-end smoke test
+  over HTTP (register company → post job → register candidate → apply →
+  company reads its applicant list), which is Night 8's core task done in
+  substance — and it was the smoke test that surfaced the subtle bugs in
+  that war-stories section. The README is honest about scope, too:
+  owner-only rules and verified-company checks are openly listed as
+  Phase 2 work. One slip: the clone URL in Setup is missing the repo
+  name's `00-` prefix. Technical breakdown in `docs/technical-notes.md`,
+  entry 12.
