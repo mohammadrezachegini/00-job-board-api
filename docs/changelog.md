@@ -2,6 +2,7 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-25 — docs: update changelog [skip changelog] (debf1e3)
 - 2026-10-24 — docs: technical notes entry 12 — README and the smoke test's silent failures (1cc084c)
 - 2026-10-24 — docs: journal — Phase 1 README and smoke test (13fa592)
 - 2026-10-25 — docs: update changelog [skip changelog] (fa5028d)
