@@ -66,14 +66,16 @@ class CompanyRegistrationSerializer(BaseRegistrationSerializer):
 class CandidateRegistrationSerializer(BaseRegistrationSerializer):
     headline = serializers.CharField(max_length=200, required=False, allow_blank=True)
     location = serializers.CharField(max_length=200, required=False, allow_blank=True)
-    skills = serializers.ListField(child=serializers.CharField(max_length=100), required=False)
-    
+    skills = serializers.ListField(
+        child=serializers.CharField(max_length=100), required=False
+    )
+
     @transaction.atomic
     def create(self, validated_data):
         user = self.create_user(validated_data, role=User.Role.CANDIDATE)
         CandidateProfile.objects.create(user=user, **validated_data)
         return user
-    
+
 
 class JobSerializer(serializers.ModelSerializer):
     company = serializers.CharField(source="company.name", read_only=True)
@@ -93,13 +95,13 @@ class JobSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
-        
-        
+
+
 class ApplicationSerializer(serializers.ModelSerializer):
     job = serializers.PrimaryKeyRelatedField(queryset=Job.objects.all())
     job_title = serializers.CharField(source="job.title", read_only=True)
     candidate = serializers.CharField(source="candidate.user.username", read_only=True)
-    
+
     class Meta:
         model = Application
         fields = [
@@ -110,18 +112,25 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "cover_letter",
             "status",
             "created_at",
-            "updated_at"
+            "updated_at",
         ]
         read_only_fields = ["id", "status", "created_at", "updated_at"]
         validators = []
-        
+
     def validate_job(self, job):
         if not job.is_open:
-            raise serializers.ValidationError("This job is no longer accepting applications.")
+            raise serializers.ValidationError(
+                "This job is no longer accepting applications."
+            )
         return job
-    
+
     def validate(self, attrs):
         profile = getattr(self.context["request"].user, "candidate_profile", None)
-        if profile and Application.objects.filter(job=attrs["job"], candidate=profile).exists():
-            raise serializers.ValidationError({"job": "You have already applied for this job."})
+        if (
+            profile
+            and Application.objects.filter(job=attrs["job"], candidate=profile).exists()
+        ):
+            raise serializers.ValidationError(
+                {"job": "You have already applied for this job."}
+            )
         return attrs
