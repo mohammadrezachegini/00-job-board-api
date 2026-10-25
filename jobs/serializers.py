@@ -3,7 +3,7 @@ from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.db import transaction
 from rest_framework import serializers
 
-from .models import CandidateProfile, Company, Job
+from .models import CandidateProfile, Company, Job, Application
 
 User = get_user_model()
 
@@ -93,3 +93,35 @@ class JobSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+        
+        
+class ApplicationSerializer(serializers.ModelSerializer):
+    job = serializers.PrimaryKeyRelatedField(queryset=Job.objects.all())
+    job_title = serializers.CharField(source="job.title", read_only=True)
+    candidate = serializers.CharField(source="candidate.user.username", read_only=True)
+    
+    class Meta:
+        model = Application
+        fields = [
+            "id",
+            "job",
+            "job_title",
+            "candidate",
+            "cover_letter",
+            "status",
+            "created_at",
+            "updated_at"
+        ]
+        read_only_fields = ["id", "status", "created_at", "updated_at"]
+        validators = []
+        
+    def validate_job(self, job):
+        if not job.is_open:
+            raise serializers.ValidationError("This job is no longer accepting applications.")
+        return job
+    
+    def validate(self, attrs):
+        profile = getattr(self.context["request"].user, "candidate_profile", None)
+        if profile and Application.objects.filter(job=attrs["job"], candidate=profile).exists():
+            raise serializers.ValidationError({"job": "You have already applied for this job."})
+        return attrs
