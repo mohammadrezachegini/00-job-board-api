@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-24 — docs: technical notes entry 11 — application endpoints (4fbe492)
+- 2026-10-24 — docs: journal — application endpoints (Night 7, mostly) (68c0b88)
+- 2026-10-25 — docs: update changelog [skip changelog] (7ebf2db)
 - 2026-10-24 — Add application endpoints: apply, detail, job applicants; fix validator scope and typos (88ea9ca)
 - 2026-10-24 — docs: update changelog [skip changelog] (1674d0e)
 - 2026-10-24 — docs: update changelog [skip changelog] (9cb073e)
