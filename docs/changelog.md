@@ -2,6 +2,7 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-25 — docs: update changelog [skip changelog] (28189ba)
 - 2026-10-24 — docs: technical notes entry 11 — application endpoints (4fbe492)
 - 2026-10-24 — docs: journal — application endpoints (Night 7, mostly) (68c0b88)
 - 2026-10-25 — docs: update changelog [skip changelog] (7ebf2db)
