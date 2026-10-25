@@ -151,3 +151,18 @@ This journal is updated as new work is pushed.
   close action (`POST /jobs/{id}/close/`) plus public browsing aren't in
   yet — those sit naturally with Night 9's permissions work.
   Technical breakdown in `docs/technical-notes.md`, entry 10.
+- 2026-10-24 (commit `88ea9ca`, "Add application endpoints"): candidates
+  can now apply — `POST /api/applications/` takes the candidate from the
+  token, rejects closed jobs, and a duplicate application returns a
+  clean 400 ("You have already applied for this job") instead of a
+  server error, enforced twice: a friendly pre-check and the database
+  constraint caught and translated. Companies can list a job's
+  applicants at `GET /api/jobs/{id}/applications/`, and the Night 6
+  "500 instead of 403" bug is fixed (DRF's `PermissionDenied` now).
+  Still open after this commit, per the technical notes: the
+  my-applications list from the brief isn't built yet; the applicant
+  list and application detail don't yet restrict who can see them
+  (ownership scoping — Night 9's territory, but applicant data is
+  sensitive); and two small serializer mismatches from entry 8 remain
+  unfixed despite the commit title mentioning typos.
+  Technical breakdown in `docs/technical-notes.md`, entry 11.
