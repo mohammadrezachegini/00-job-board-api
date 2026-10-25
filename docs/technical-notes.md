@@ -1034,3 +1034,99 @@ naturally with Night 9's custom permissions, where `IsCompany` and
 - "PermissionError is not PermissionDenied: DRF's exception handler, precisely"
 - "perform_create and the server-side injection pattern"
 - "Why your list endpoint and your detail endpoint want different querysets"
+
+---
+
+## Entry 11 — 2026-10-24 — Application endpoints (commit `88ea9ca`)
+
+### Applying, done in layers
+
+```python
+class ApplicationViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin,
+                         viewsets.GenericViewSet):
+    serializer_class = ApplicationSerializer
+    queryset = Application.objects.select_related("job__company", "candidate__user")
+
+    def perform_create(self, serializer):
+        if not self.request.user.is_candidate:
+            raise PermissionDenied("Only candidate users can create applications.")
+        try:
+            with transaction.atomic():
+                serializer.save(candidate=self.request.user.candidate_profile)
+        except IntegrityError:
+            raise ValidationError({"job": "You have already applied for this job."})
+```
+
+The duplicate-application defence is built **three layers deep**, and each
+layer exists because the one above it has a known hole:
+
+1. **Serializer `validate()` pre-check** — looks up an existing
+   (job, candidate) application and raises a friendly field error. This
+   is the layer users normally see. It is also *racy*: two simultaneous
+   requests can both pass it.
+2. **The database `UniqueConstraint`** (entry 9) — the layer that cannot
+   be raced. The losing request's insert raises `IntegrityError`.
+3. **The translation** — `perform_create` catches that `IntegrityError`
+   and re-raises DRF's `ValidationError`, so the race's loser still gets
+   the same clean 400 as everyone else, never a 500. The inner
+   `transaction.atomic()` block matters here: on PostgreSQL an error
+   poisons the surrounding transaction ("current transaction is
+   aborted"), and the atomic block's rollback-to-savepoint is what makes
+   it safe to catch the error and keep responding.
+
+Two more pieces of the same discipline: **`validators = []`** in the
+serializer's Meta disables DRF's automatic `UniqueTogetherValidator` —
+necessary, because that validator needs `candidate` among the writable
+fields, and here `candidate` is deliberately read-only (injected from
+the token, like `company` in entry 10). The auto-validator is replaced
+by the manual layers above, not just removed. And `validate_job`
+rejects closed jobs at the field level, while `status` is read-only —
+an applicant cannot set their own status to `offered`.
+
+Also fixed from entry 10: `JobViewSet.perform_create` now raises DRF's
+`PermissionDenied`, so non-companies get a proper 403 instead of a 500.
+
+### Findings (ownership is the theme)
+
+1. **The applicants list has no ownership check.** The new
+   `GET /jobs/{id}/applications/` action calls `get_object()` on the
+   unscoped job queryset — *any* authenticated user, candidate or rival
+   company, can enumerate who applied to any job. Applicant lists are
+   among the most sensitive data in this system (they reveal people's
+   job searches). This needs `job.company.user == request.user`
+   enforcement — the single most important fix currently outstanding.
+2. **Application detail is unscoped too.** `RetrieveModelMixin` over
+   the full queryset means any logged-in user can read any application
+   by id (an IDOR). The queryset should scope by role: candidates see
+   their own, companies see applications to their own jobs.
+3. **The brief's my-applications list is missing.** Night 7 calls for
+   `GET /applications/mine/`; the viewset has create + retrieve only.
+4. **The "fix typos" half of the commit title didn't land.** Verified
+   in the current files: `validate_email(delf, …)` still reads `delf`,
+   and the entry 8 mismatches are unchanged — candidate `location`
+   still allows 200 chars into a 100-char column, `skills` items 100
+   into a 50-char column. Harmless tonight, a 500 the first time a user
+   types a long location.
+5. Entry 10's update-ownership finding also still stands (any
+   authenticated user can PATCH any job). Findings 1, 2, and 5 are the
+   same root cause — object ownership hasn't been modelled yet — and
+   they are exactly what Night 9's permission classes
+   (`IsCompany`, `IsCandidate`, ownership) are for. Until then they
+   are known, documented holes, fine for a local dev build, blockers
+   for anything public.
+
+### Status
+
+Night 7 is **mostly** complete: apply, closed-job rejection,
+duplicate→400 (double-enforced), and application detail work; the
+my-applications list, ownership scoping, and the deferred serializer
+cleanups remain. Next per plan is Night 8 — the end-to-end smoke test —
+which would be a good moment to see several of these findings fire (or
+not) against a running stack.
+
+### Article angles
+
+- "Friendly check, honest constraint, clean translation: error handling in three layers"
+- "Why catching IntegrityError needs a savepoint: PostgreSQL's aborted transaction"
+- "validators = [] is a decision, not a deletion: replacing DRF's auto UniqueTogetherValidator"
+- "IDOR in your own API: the ownership checks nobody writes on the first pass"
