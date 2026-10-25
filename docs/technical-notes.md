@@ -1130,3 +1130,79 @@ not) against a running stack.
 - "Why catching IntegrityError needs a savepoint: PostgreSQL's aborted transaction"
 - "validators = [] is a decision, not a deletion: replacing DRF's auto UniqueTogetherValidator"
 - "IDOR in your own API: the ownership checks nobody writes on the first pass"
+
+---
+
+## Entry 12 — 2026-10-24 — The Phase 1 README, and what the smoke test caught (commits `c23809b`, `1f47139`)
+
+The README itself is good portfolio craft — architecture diagram, an
+endpoint table that matches the built routes exactly, an env-var
+reference, design decisions stated as decisions, and a status line that
+does not oversell ("Owner-only rules and verified-company checks are
+planned for Phase 2" — precisely the open findings from entries 10 and
+11). But its most valuable section is **"What Broke and How I Fixed
+It"**, because those five bugs share one property: *none of them crash
+on the happy path.* They are silent failures, and only the end-to-end
+smoke test — exercising the negative paths on purpose — exposed them.
+
+### A small taxonomy of silent failures
+
+1. **Dead code by indentation.** Two serializer validators were
+   indented inside `class Meta`, so DRF never called them: closed jobs
+   accepted applications, and only the PostgreSQL unique constraint
+   (the layer from entries 9/11 that cannot be talked out of its job)
+   kept duplicates out. The diagnostic clue deserves framing: *the
+   shape of the error body* — a plain string means the view raised it,
+   a per-field list means the serializer did. When an expected
+   serializer error arrives in view shape, the validator isn't running.
+2. **A defensive default that hides typos.** `getattr(user,
+   "candidateprofile", None)` — one missing underscore, and the
+   duplicate check quietly received `None` and stood down. `getattr`
+   with a default is a deliberate "this may legitimately not exist"
+   tool; used on an attribute that must exist, it converts a loud
+   `AttributeError` into a silent logic-off switch. Prefer direct
+   attribute access for must-exist relations and let it crash in dev.
+3. **An env var typo nobody reports.** `PYTHONBUFFERED` for
+   `PYTHONUNBUFFERED` in the Dockerfile: Python ignores unknown
+   variable names, so the only symptom was buffered logs — the absence
+   of behaviour, the hardest class of bug to notice.
+4. **Convention-based wiring.** The `@action` was named `application`,
+   so the route was `/jobs/{id}/application/` and the documented URL
+   404'd — in DRF, the method name *is* the URL segment unless `url_path`
+   overrides it. No configuration was wrong; a name was.
+5. **A wrong enum member, found only on execution.** `User.Role.Company`
+   for `User.Role.COMPANY` — Python doesn't check attribute names until
+   the line runs, and that line runs only when a company signs up.
+   Static happy-path testing (server starts, a GET returns 200) would
+   never have touched it; the smoke test's register-a-company step did.
+
+### The lesson the phase teaches
+
+Every one of these survived "the code looks right" and "the server
+starts". They fell to a *scripted story*: register, log in, post, apply,
+apply again, apply to a closed job, read the list back. That is Night
+8's smoke test doing exactly its job, and it retroactively justifies
+the project's recurring pattern — defense in depth (entries 9 and 11)
+meant the dead validators degraded the experience (wrong error shape,
+constraint errors instead of friendly ones) instead of corrupting data.
+
+Two follow-ups worth doing: check the smoke script into the repo
+(`scripts/smoke.sh`) so the story is re-runnable after every change,
+not just pasted in the README; and fix the README's clone URL, which
+reads `…/job-board-api.git` — the repo is `00-job-board-api`, so the
+copy-paste currently 404s.
+
+### Status
+
+Phase 1 (core app: models, auth, registration, jobs, applications) is
+documented and smoke-verified end to end. Open items carried forward:
+ownership/verified-company permissions (Phase 2 / Night 9), the
+my-applications list, status updates, the entry 8 serializer cleanups,
+and the smoke script check-in. Next per plan: Night 9 permissions.
+
+### Article angles
+
+- "Bugs that don't crash: a taxonomy of silent failures"
+- "Read the error shape: what a DRF response body tells you about which layer raised it"
+- "getattr with a default is a loaded foot-gun: silent None vs loud AttributeError"
+- "The smoke test is a story, not a checklist: scripting the negative paths"
