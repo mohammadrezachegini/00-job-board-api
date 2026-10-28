@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-27 — docs: journal — permission classes (Night 9 begins) (8d8a26e)
+- 2026-10-28 — docs: update changelog [skip changelog] (a4f8fdb)
 - 2026-10-27 — Add IsVerifiedCompany and IsCandidate permissions; replace inline role checks (8314a99)
 - 2026-10-25 — docs: update changelog [skip changelog] (07eef22)
 - 2026-10-25 — docs: update changelog [skip changelog] (debf1e3)
