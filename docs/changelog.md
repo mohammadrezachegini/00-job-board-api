@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-27 — docs: technical notes entry 13 — permission classes (569a64e)
+- 2026-10-28 — docs: update changelog [skip changelog] (d5fd48c)
 - 2026-10-27 — docs: journal — permission classes (Night 9 begins) (8d8a26e)
 - 2026-10-28 — docs: update changelog [skip changelog] (a4f8fdb)
 - 2026-10-27 — Add IsVerifiedCompany and IsCandidate permissions; replace inline role checks (8314a99)
