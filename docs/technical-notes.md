@@ -1206,3 +1206,100 @@ and the smoke script check-in. Next per plan: Night 9 permissions.
 - "Read the error shape: what a DRF response body tells you about which layer raised it"
 - "getattr with a default is a loaded foot-gun: silent None vs loud AttributeError"
 - "The smoke test is a story, not a checklist: scripting the negative paths"
+
+---
+
+## Entry 13 — 2026-10-27 — Permission classes: IsVerifiedCompany, IsCandidate (commit `8314a99`)
+
+### Authorization moves to the door
+
+```python
+class IsVerifiedCompany(BasePermission):
+    message = "Only company accounts can do this."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user.is_authenticated or not user.is_company:
+            return False
+        company = getattr(user, "company", None)
+        if company is None or not company.is_verified:
+            self.message = "Your company account is not verified."
+            return False
+        return True
+
+class IsCandidate(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return (
+            user.is_authenticated
+            and user.is_candidate
+            and hasattr(user, "candidate_profile")
+        )
+```
+
+Wired per-action, the idiomatic DRF way:
+
+```python
+def get_permissions(self):
+    if self.action == "create":
+        return [IsAuthenticated(), IsVerifiedCompany()]
+    return super().get_permissions()
+```
+
+Why this shape is better than the inline checks it supersedes:
+
+- **Permissions run before the view.** An unauthorized request is
+  rejected before any handler code, serializer, or query executes —
+  fail fast, and fail *outside* the business logic. The inline
+  `perform_create` checks from entries 10–11 still exist as a second
+  layer (the commit title says "replace"; in fact they were kept and
+  are now simply unreachable on the guarded paths — defence in depth,
+  though worth a comment in the code so a future reader doesn't think
+  them primary).
+- **The verified-company gate is a business rule, not just a role
+  check.** `IsVerifiedCompany` chains three conditions — authenticated,
+  company role, `company.is_verified` — tying back to the boolean that
+  has been sitting on the Company model since entry 6, flipped only in
+  the Django admin (`list_editable`, entry 6). Consequence worth
+  stating plainly: a newly registered company can log in and browse,
+  but **cannot post a job until an admin verifies it** — a deliberate
+  trust gate, and the 403 message says exactly that ("Your company
+  account is not verified." vs the generic "Only company accounts can
+  do this." for wrong-role callers; two audiences, two messages).
+- **`getattr`/`hasattr` used correctly this time.** Entry 12's war
+  story was `getattr` hiding a typo'd relation name. Here absence is
+  *legitimate* — a company user might genuinely have no profile row —
+  and Django's `RelatedObjectDoesNotExist` subclasses `AttributeError`,
+  so `getattr(user, "company", None)` and
+  `hasattr(user, "candidate_profile")` are precisely the right tools.
+  Same tool, opposite verdicts: the difference is whether "missing" is
+  a valid state or a bug.
+- **`message` as a mutable attribute** works because DRF builds fresh
+  permission instances per request via `get_permissions()`; the
+  tailored message never leaks across requests. (It would be a bug in
+  a singleton; it is a feature here.)
+
+### What Night 9 still owes (the ownership half)
+
+Nothing in this commit is object-level: there is no
+`has_object_permission` anywhere, so the three findings carried since
+entries 10–11 stand unchanged —
+
+1. any authenticated user can still PATCH any job (update is gated
+   only by login);
+2. the applicants list still answers any authenticated caller;
+3. application detail is still readable by id, unscoped.
+
+These need an ownership permission (object's `company.user` must equal
+`request.user`) applied to update + the applications action, plus
+queryset scoping on application retrieve. The my-applications list is
+also still unbuilt. Role gates say *what kind of user* you are;
+ownership says *which rows are yours* — the API now has the first and
+still needs the second before any public exposure.
+
+### Article angles
+
+- "has_permission vs has_object_permission: the two questions every API must answer"
+- "Per-action permissions with get_permissions: one viewset, several doors"
+- "Verification as a state machine of one boolean: the admin-flipped trust gate"
+- "getattr redemption: when a defensive default is the correct design"
