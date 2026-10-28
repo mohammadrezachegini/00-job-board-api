@@ -179,3 +179,14 @@ This journal is updated as new work is pushed.
   Phase 2 work. One slip: the clone URL in Setup is missing the repo
   name's `00-` prefix. Technical breakdown in `docs/technical-notes.md`,
   entry 12.
+- 2026-10-27 (commit `8314a99`, "Add IsVerifiedCompany and IsCandidate
+  permissions"): Night 9 begins — role checks move out of the views into
+  real DRF permission classes. Posting a job now requires a *verified*
+  company: a fresh company account gets a clear 403 ("Your company
+  account is not verified.") until an admin verifies it in Django
+  admin. Applying requires a candidate account with a profile. The
+  checks now run before the view even executes, which is where
+  authorization belongs. Still open from the earlier reviews: ownership
+  rules (who can update a job, who can see an applicant list) — no
+  object-level permission exists yet — and the my-applications list.
+  Technical breakdown in `docs/technical-notes.md`, entry 13.
