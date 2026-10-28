@@ -2,7 +2,8 @@ from django.db import IntegrityError, transaction
 from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from .permissions import IsVerifiedCompany, IsCandidate
 
 from .models import Application, Job
 from .serializers import (
@@ -34,6 +35,11 @@ class JobViewSet(
 ):
 
     serializer_class = JobSerializer
+    
+    def get_permissions(self):
+        if self.action == "create":
+            return [IsAuthenticated(), IsVerifiedCompany()]
+        return super().get_permissions()
 
     def get_queryset(self):
         queryset = Job.objects.select_related("company")
@@ -60,6 +66,11 @@ class JobViewSet(
 class ApplicationViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     serializer_class = ApplicationSerializer
     queryset = Application.objects.select_related("job__company", "candidate__user")
+    
+    def get_permissions(self):
+        if self.action == "create":
+            return [IsAuthenticated(), IsCandidate()]
+        return super().get_permissions()
     
     def perform_create(self, serializer):
         if not self.request.user.is_candidate:
