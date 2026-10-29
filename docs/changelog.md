@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-28 — Add status endpoint (job owner only); IsJobOwner handles applications; require status field (974be03)
+- 2026-10-29 — docs: update changelog [skip changelog] (b9905a5)
 - 2026-10-29 — docs: update changelog [skip changelog] (0f3534a)
 - 2026-10-28 — docs: technical notes entry 14 — object permissions (ownership) (cdfb179)
 - 2026-10-28 — docs: journal — object permissions complete Night 9 (e083179)
