@@ -3,11 +3,13 @@ from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 from .permissions import IsVerifiedCompany, IsCandidate, IsJobOwner, IsApplicantOwner
 
 from .models import Application, Job
 from .serializers import (
     ApplicationSerializer,
+    ApplicationStatusSerializer,
     CandidateRegistrationSerializer,
     CompanyRegistrationSerializer,
     JobSerializer,
@@ -35,7 +37,7 @@ class JobViewSet(
 ):
 
     serializer_class = JobSerializer
-    
+
     def get_permissions(self):
         if self.action == "create":
             return [IsAuthenticated(), IsVerifiedCompany()]
@@ -65,17 +67,21 @@ class JobViewSet(
         return self.get_paginated_response(serializer.data)
 
 
-class ApplicationViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+class ApplicationViewSet(
+    mixins.CreateModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
+):
     serializer_class = ApplicationSerializer
     queryset = Application.objects.select_related("job__company", "candidate__user")
-    
+
     def get_permissions(self):
         if self.action == "create":
             return [IsAuthenticated(), IsCandidate()]
         if self.action == "retrieve":
             return [IsAuthenticated(), IsApplicantOwner()]
+        if self.action == "set_status":
+            return [IsAuthenticated(), IsJobOwner()]
         return super().get_permissions()
-    
+
     def perform_create(self, serializer):
         if not self.request.user.is_candidate:
             raise PermissionDenied("Only candidate users can create applications.")
@@ -84,4 +90,15 @@ class ApplicationViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, vie
                 serializer.save(candidate=self.request.user.candidate_profile)
         except IntegrityError:
             raise ValidationError({"job": "You have already applied for this job."})
-        
+
+    @action(detail=True, methods=["patch"], url_path="status")
+    def set_status(self, request, pk=None):
+        application = self.get_object()
+        serializer = ApplicationStatusSerializer(application, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            ApplicationSerializer(
+                application, context=self.get_serializer_context()
+            ).data
+        )

@@ -134,3 +134,12 @@ class ApplicationSerializer(serializers.ModelSerializer):
                 {"job": "You have already applied for this job."}
             )
         return attrs
+
+
+class ApplicationStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Application
+        fields = ["status"]
+        extra_kwargs = {
+            "status": {"required": True}
+        }

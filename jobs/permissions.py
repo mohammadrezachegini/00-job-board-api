@@ -1,4 +1,5 @@
 from rest_framework.permissions import BasePermission
+from .models import Application
 
 
 class IsVerifiedCompany(BasePermission):
@@ -31,9 +32,9 @@ class IsJobOwner(BasePermission):
     message = "Only the company that posted this job can do this."
 
     def has_object_permission(self, request, view, obj):
+        job = obj.job if isinstance(obj, Application) else obj
         company = getattr(request.user, "company", None)
-        return company is not None and obj.company_id == company.id
-
+        return company is not None and job.company_id == company.id
 
 class IsApplicantOwner(BasePermission):
     message = "You don't have access to this application."
