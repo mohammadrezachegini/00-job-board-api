@@ -190,3 +190,15 @@ This journal is updated as new work is pushed.
   rules (who can update a job, who can see an applicant list) — no
   object-level permission exists yet — and the my-applications list.
   Technical breakdown in `docs/technical-notes.md`, entry 13.
+- 2026-10-28 (commit `88b6f6f`, "Add IsJobOwner and IsApplicationOwner
+  object permissions; add dev helper script"): Night 9 is complete.
+  Ownership has arrived: only the company that posted a job can update
+  it or view its applicants, and an application can be read only by the
+  candidate who sent it or the company that received it. This closes
+  the three authorization holes flagged in the reviews of Nights 6–7.
+  The commit also adds `scripts/dev-helper.sh` — shell helpers that log
+  in the six local test users (three companies, three candidates),
+  which is exactly the cast needed to prove one company can't touch
+  another's jobs. Remaining known items: the my-applications list, and
+  the small serializer cleanups from entry 8. Technical breakdown in
+  `docs/technical-notes.md`, entry 14.
