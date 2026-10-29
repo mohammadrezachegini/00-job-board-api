@@ -1303,3 +1303,102 @@ still needs the second before any public exposure.
 - "Per-action permissions with get_permissions: one viewset, several doors"
 - "Verification as a state machine of one boolean: the admin-flipped trust gate"
 - "getattr redemption: when a defensive default is the correct design"
+
+---
+
+## Entry 14 — 2026-10-28 — Object permissions: IsJobOwner, IsApplicantOwner (commit `88b6f6f`)
+
+### The second question: which rows are yours?
+
+Entry 13's classes answer "what kind of user are you?" at the door
+(`has_permission`, runs before the view). This commit adds the second,
+per-object question via `has_object_permission`, which DRF runs inside
+`get_object()` — after the row is fetched, before the handler touches
+it:
+
+```python
+class IsJobOwner(BasePermission):
+    message = "Only the company that posted this job can do this."
+
+    def has_object_permission(self, request, view, obj):
+        company = getattr(request.user, "company", None)
+        return company is not None and obj.company_id == company.id
+
+class IsApplicantOwner(BasePermission):
+    message = "You don't have access to this application."
+
+    def has_object_permission(self, request, view, obj):
+        profile = getattr(request.user, "candidate_profile", None)
+        if profile is not None and obj.candidate_id == profile.id:
+            return True
+        company = getattr(request.user, "company", None)
+        return company is not None and obj.job.company_id == company.id
+```
+
+Wiring matters as much as the classes:
+
+- `JobViewSet.get_permissions()` now routes `update`, `partial_update`,
+  **and the `applications` action** through `IsJobOwner`. The action
+  inclusion is the payoff of entry 11's worst finding: the applicants
+  list calls `self.get_object()`, which triggers the object check, so
+  the list is owner-only without a line of code inside the action
+  itself. Entry 10's "anyone can PATCH any job" and entry 11's
+  "anyone can enumerate applicants" are both **closed**.
+- `ApplicationViewSet` routes `retrieve` through `IsApplicantOwner` —
+  entry 11's unscoped-detail (IDOR) finding is **closed**. The class
+  encodes the domain's two legitimate readers in one place: the
+  candidate who sent the application *or* the company whose job
+  received it. Everyone else gets 403.
+- **Comparisons use `_id` attributes** (`obj.company_id`,
+  `obj.candidate_id`, `obj.job.company_id`) rather than fetching the
+  related objects — the foreign-key values are already on the row, so
+  the check costs no extra queries beyond the job lookup the
+  application check needs.
+- Job *detail* stays readable by any authenticated user (not routed
+  through IsJobOwner) — deliberate: candidates must be able to read
+  jobs they don't own. Ownership restricts *writing* and *applicant
+  data*, not reading the catalogue. That asymmetry is the product
+  rule, expressed in one `get_permissions` branch.
+
+Two honest notes:
+
+- **403, not 404, for other people's rows.** A non-owner probing an
+  existing job's applicants learns that the job exists (403) rather
+  than getting a camouflaging 404. That is stock DRF behaviour and the
+  project's brief explicitly wants 403s; some APIs choose
+  existence-hiding 404s instead — a trade-off to make consciously if
+  this ever faces the public internet.
+- **Names drifted slightly**: the commit title says
+  `IsApplicationOwner`; the class is `IsApplicantOwner`. Trivial, but
+  in a codebase where entry 12 showed names *are* wiring (actions,
+  relations), consistency is worth the rename at some point.
+
+### The dev helper: a manual test harness with exactly the right cast
+
+`scripts/dev-helper.sh` provides `token()` (fetch a JWT for a local
+user) and `login_all()`, which loads tokens for six seeded users —
+companies acme/globex/initech, candidates dana/sam/riya (riya of the
+README smoke test). You cannot test ownership with one user: the cast
+*is* the test design — company B's token against company A's job is
+the case that proves the boundary. (Small slip inside it: the header
+comment says `source scripts/dev-helpers.sh`, plural; the file is
+`dev-helper.sh`.) It is a manual harness, not automated tests —
+`jobs/tests.py` is still the stock stub, and per the README the pytest
+suite is Phase 5 work.
+
+### Status
+
+**Night 9 is complete**: role gates (entry 13) + ownership (this
+entry). The API's authorization story is now coherent end to end —
+default-deny, verified companies post, owners edit, applicants are
+visible only to the two parties involved. Carried forward: the
+my-applications list (Night 7 leftover), company-side status updates
+and the dedicated close action, and entry 8's serializer length
+cleanups + `delf`.
+
+### Article angles
+
+- "Two permission questions: has_permission guards the door, has_object_permission guards the row"
+- "The applicants list is the crown jewels: scoping your most sensitive endpoint"
+- "403 or 404 for other people's data? The existence-leak trade-off"
+- "You can't test ownership with one user: casting a dev environment"
