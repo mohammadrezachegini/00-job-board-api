@@ -202,3 +202,12 @@ This journal is updated as new work is pushed.
   another's jobs. Remaining known items: the my-applications list, and
   the small serializer cleanups from entry 8. Technical breakdown in
   `docs/technical-notes.md`, entry 14.
+- 2026-10-28 (commit `974be03`, "Add status endpoint (job owner only)"):
+  companies can now move an application through the pipeline —
+  `PATCH /api/applications/{id}/status/` accepts only a `status` value
+  and only from the company that owns the job. The permission class
+  from Night 9 was generalised rather than duplicated: `IsJobOwner`
+  now understands both Job and Application objects. Status stays
+  read-only everywhere else, so this endpoint is the single door for
+  changing it. Technical breakdown in `docs/technical-notes.md`,
+  entry 15.
