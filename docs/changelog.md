@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-28 — docs: journal — application status endpoint (2f2bfbb)
+- 2026-10-29 — docs: update changelog [skip changelog] (58d0d42)
 - 2026-10-28 — Add status endpoint (job owner only); IsJobOwner handles applications; require status field (974be03)
 - 2026-10-29 — docs: update changelog [skip changelog] (b9905a5)
 - 2026-10-29 — docs: update changelog [skip changelog] (0f3534a)
