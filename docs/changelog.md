@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-28 — docs: journal — skill match score (0179538)
+- 2026-10-29 — docs: update changelog [skip changelog] (b08e689)
 - 2026-10-28 — Add skill match score (matching.py) to application responses (5e57769)
 - 2026-10-29 — docs: update changelog [skip changelog] (3d54317)
 - 2026-10-28 — docs: technical notes entry 15 — application status endpoint (99b84e3)
