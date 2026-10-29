@@ -1402,3 +1402,80 @@ cleanups + `delf`.
 - "The applicants list is the crown jewels: scoping your most sensitive endpoint"
 - "403 or 404 for other people's data? The existence-leak trade-off"
 - "You can't test ownership with one user: casting a dev environment"
+
+---
+
+## Entry 15 — 2026-10-28 — Application status endpoint (commit `974be03`)
+
+### One door for status changes
+
+```python
+@action(detail=True, methods=["patch"], url_path="status")
+def set_status(self, request, pk=None):
+    application = self.get_object()
+    serializer = ApplicationStatusSerializer(application, data=request.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(ApplicationSerializer(application, context=...).data)
+```
+
+with a dedicated serializer whose only field is the point:
+
+```python
+class ApplicationStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Application
+        fields = ["status"]
+        extra_kwargs = {"status": {"required": True}}
+```
+
+Design points:
+
+- **A separate write serializer for a separate privilege.** The main
+  `ApplicationSerializer` keeps `status` in `read_only_fields` — the
+  candidate-facing create/read paths *cannot* move a status, even by
+  accident. The status endpoint uses its own one-field serializer, so
+  the request contract is exactly "one status value, nothing else":
+  there is no field through which a caller could also rewrite the
+  cover letter or re-point the application at another job. Read
+  contract and write contract evolve independently.
+- **`required: True` on a PATCH is deliberate.** PATCH normally means
+  "any subset may change"; here the subset has exactly one member, so
+  requiring it turns an empty body into a clear 400 instead of a
+  silent no-op success. The model's `TextChoices` give value
+  validation (and a helpful choices list in the error) for free.
+- **The permission generalised instead of duplicating.** `IsJobOwner`
+  now unwraps the object — `obj.job if isinstance(obj, Application)
+  else obj` — then applies the same `company_id` comparison. One class
+  guards jobs *and* applications-to-jobs, routed by `get_permissions`
+  for the `set_status` action; `get_object()` fires the object check
+  before the serializer runs. The alternative (an
+  `IsApplicationJobOwner` clone) would have doubled the surface for
+  the exact bugs permissions exist to prevent.
+- **The response is the full read representation**, not the one-field
+  write shape — clients get the updated application as they would see
+  it anywhere else, `updated_at` bumped by `auto_now`.
+
+Notably absent, and fine for now: **transition rules**. Any status can
+move to any other (a rejected application can be set straight to
+offered). A real hiring pipeline might constrain that
+(submitted → reviewing → interview → offered/rejected); the model
+stores no history, so a status audit trail would be a bigger feature
+(and later phases have a notifications/worker story it would feed).
+Flagged, not blocking.
+
+### Status
+
+Phase 2's endpoint set is nearly complete: permissions (entries
+13–14) + status (this entry). Remaining known items: the
+my-applications list (candidates still can't enumerate their own
+applications), the dedicated job close action, and entry 8's
+serializer hygiene (`delf`, the two length mismatches). Next in the
+plan come match scoring, resume upload, and search/filters.
+
+### Article angles
+
+- "One field, one serializer, one door: designing privileged mutations"
+- "Generalise the permission, don't clone it: polymorphic object checks"
+- "PATCH semantics vs required fields: turning no-ops into 400s"
+- "Status machines without transition rules: when YAGNI is the right call"
