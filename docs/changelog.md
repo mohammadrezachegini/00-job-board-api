@@ -2,6 +2,7 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-29 — docs: update changelog [skip changelog] (0f3534a)
 - 2026-10-28 — docs: technical notes entry 14 — object permissions (ownership) (cdfb179)
 - 2026-10-28 — docs: journal — object permissions complete Night 9 (e083179)
 - 2026-10-29 — docs: update changelog [skip changelog] (0c018b6)
