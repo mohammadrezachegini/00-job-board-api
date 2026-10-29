@@ -211,3 +211,12 @@ This journal is updated as new work is pushed.
   read-only everywhere else, so this endpoint is the single door for
   changing it. Technical breakdown in `docs/technical-notes.md`,
   entry 15.
+- 2026-10-28 (commit `5e57769`, "Add skill match score (matching.py)"):
+  applications now carry a `match_score` — the percentage of a job's
+  required skills the candidate actually has, computed fresh on every
+  response (never stored). Skill names are compared case-insensitively
+  with whitespace trimmed, and a job with no required skills returns
+  `null` rather than a fake 100. The scoring logic lives in its own
+  tiny pure-Python module with no Django imports, ready to be unit
+  tested in Phase 5. Technical breakdown in `docs/technical-notes.md`,
+  entry 16.
