@@ -1479,3 +1479,81 @@ plan come match scoring, resume upload, and search/filters.
 - "Generalise the permission, don't clone it: polymorphic object checks"
 - "PATCH semantics vs required fields: turning no-ops into 400s"
 - "Status machines without transition rules: when YAGNI is the right call"
+
+---
+
+## Entry 16 — 2026-10-28 — Skill match scoring (commit `5e57769`)
+
+### Fifteen lines, zero framework
+
+```python
+# jobs/matching.py — no Django imports at all
+def normalize_skills(skills):
+    return {skill.strip().lower() for skill in skills if skill and skill.strip()}
+
+
+def match_score(required_skills, candidate_skills):
+    required = normalize_skills(required_skills)
+    if not required:
+        return None
+    matches = required & normalize_skills(candidate_skills)
+    return round(100 * len(matches) / len(required))
+```
+
+```python
+# serializers.py
+match_score = serializers.SerializerMethodField()
+
+def get_match_score(self, obj):
+    return matching.match_score(obj.job.required_skills, obj.candidate.skills)
+```
+
+- **Pure functions in their own module.** `matching.py` knows nothing
+  about models, requests, or DRF — it maps two lists of strings to a
+  number. That makes it the most testable code in the project (Phase
+  5's pytest suite can cover it exhaustively in milliseconds, no
+  database), reusable from anywhere (a future ranking query, the
+  worker), and honest about its contract. Business logic that can live
+  outside the framework should.
+- **Normalization is the actual feature.** Raw list comparison would
+  score `"Python"` vs `"python "` as a miss. Lowercasing, stripping,
+  dropping blanks, and set-ifying both sides means the score measures
+  skills, not typing habits — and set intersection makes duplicates
+  on either side harmless. This is where the matching quality lives;
+  the arithmetic is one line.
+- **`None` for no requirements — the right call, currently
+  undocumented.** A job listing no required skills has no denominator;
+  returning 100 would claim a perfect match that means nothing, 0
+  would slander every applicant. `null` ("not applicable") is the
+  honest value, and it propagates to JSON as `null`. The brief asked
+  for the choice to be *documented* — a docstring on `match_score` or
+  a README line is still owed. (One arithmetic nuance: Python's
+  `round` uses banker's rounding, so exact .5 percentages round to
+  even — cosmetically irrelevant at this scale.)
+- **Computed, never stored.** `SerializerMethodField` derives the
+  score at read time from the two `ArrayField`s (whose symmetric
+  `CharField(50)` design from entries 6/9 exists precisely for this).
+  A stored score would rot the moment a candidate edits their skills
+  or a company edits the job; a computed one is always current. The
+  cost is trivial arithmetic per row, and the relevant relations are
+  already `select_related`'d in both querysets that serialize
+  applications, so lists don't pay N+1 queries for it.
+- **Visible on every application representation** — applicants list,
+  application detail, even the status-update response — because all of
+  them render through `ApplicationSerializer`. Candidates see their
+  own score too; harmless, arguably a feature (it tells them what to
+  learn), and the company-facing screening use was the brief's point.
+
+### Status
+
+Match scoring completes the Phase 2 feature arc: permissions
+(entries 13–14), status (15), scoring (16). Still outstanding: the
+my-applications list, resume upload, search & filters, the dedicated
+close action, and the entry 8 serializer hygiene items. 
+
+### Article angles
+
+- "Business logic that fits in 15 lines and imports nothing: pure modules in a Django app"
+- "Normalization is the feature: why matching quality lives in strip().lower()"
+- "null beats 100: honest semantics for undefined scores"
+- "Computed vs stored: deriving values that can never go stale"
