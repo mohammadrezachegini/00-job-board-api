@@ -3,7 +3,7 @@ from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .permissions import IsVerifiedCompany, IsCandidate
+from .permissions import IsVerifiedCompany, IsCandidate, IsJobOwner, IsApplicantOwner
 
 from .models import Application, Job
 from .serializers import (
@@ -39,6 +39,8 @@ class JobViewSet(
     def get_permissions(self):
         if self.action == "create":
             return [IsAuthenticated(), IsVerifiedCompany()]
+        if self.action in ("update", "partial_update", "applications"):
+            return [IsAuthenticated(), IsJobOwner()]
         return super().get_permissions()
 
     def get_queryset(self):
@@ -70,6 +72,8 @@ class ApplicationViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, vie
     def get_permissions(self):
         if self.action == "create":
             return [IsAuthenticated(), IsCandidate()]
+        if self.action == "retrieve":
+            return [IsAuthenticated(), IsApplicantOwner()]
         return super().get_permissions()
     
     def perform_create(self, serializer):
