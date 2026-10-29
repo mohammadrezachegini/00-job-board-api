@@ -4,6 +4,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .models import CandidateProfile, Company, Job, Application
+from . import matching
 
 User = get_user_model()
 
@@ -101,6 +102,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
     job = serializers.PrimaryKeyRelatedField(queryset=Job.objects.all())
     job_title = serializers.CharField(source="job.title", read_only=True)
     candidate = serializers.CharField(source="candidate.user.username", read_only=True)
+    match_score = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -111,11 +113,15 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "candidate",
             "cover_letter",
             "status",
+            "match_score",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "status", "created_at", "updated_at"]
         validators = []
+    
+    def get_match_score(self, obj):
+        return matching.match_score(obj.job.required_skills, obj.candidate.skills)
 
     def validate_job(self, job):
         if not job.is_open:
