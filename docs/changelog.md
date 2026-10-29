@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-28 — docs: technical notes entry 14 — object permissions (ownership) (cdfb179)
+- 2026-10-28 — docs: journal — object permissions complete Night 9 (e083179)
+- 2026-10-29 — docs: update changelog [skip changelog] (0c018b6)
 - 2026-10-28 — Add IsJobOwner and IsApplicationOwner object permissions; add dev helper script (88b6f6f)
 - 2026-10-28 — docs: update changelog [skip changelog] (f9defa3)
 - 2026-10-27 — docs: technical notes entry 13 — permission classes (569a64e)
