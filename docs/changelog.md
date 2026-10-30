@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-30 — Add LocalStack S3 and django-storages; resumes storage backend (27e7c68)
+- 2026-10-29 — docs: update changelog [skip changelog] (d74c3a9)
 - 2026-10-28 — docs: technical notes entry 16 — skill match scoring (8516708)
 - 2026-10-29 — docs: update changelog [skip changelog] (fdb377f)
 - 2026-10-28 — docs: journal — skill match score (0179538)
