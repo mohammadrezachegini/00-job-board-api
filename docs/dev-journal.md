@@ -251,3 +251,12 @@ This journal is updated as new work is pushed.
   the classic local-development trap where a URL signed for
   `localstack:4566` can't be opened from the host browser. Technical
   breakdown in `docs/technical-notes.md`, entry 19.
+- 2026-10-30 (commit `e860e22`, "Add job search, filters and
+  ordering"): the job list is now properly explorable — text search
+  across title, description and company name; filters for job type,
+  location (partial, case-insensitive) and skills; and ordering by
+  date or title. The quiet half of the commit matters just as much:
+  job skills are normalised (trimmed, lowercased, de-duplicated) when
+  a job is saved, and the skills filter normalises the query the same
+  way — so `Python` the posting and `python` the search actually meet.
+  Technical breakdown in `docs/technical-notes.md`, entry 20.
