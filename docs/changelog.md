@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-30 — docs: technical notes entry 19 — presigned resume downloads (8069240)
+- 2026-10-30 — docs: journal — presigned resume downloads (8d1392b)
+- 2026-10-31 — docs: update changelog [skip changelog] (0ef42d1)
 - 2026-10-30 — Add presigned resume downloads; hide resume links from responses; validate S3 signatures locally (9b20ee8)
 - 2026-10-31 — docs: update changelog [skip changelog] (ab36fd1)
 - 2026-10-30 — docs: technical notes entry 18 — resume upload (571468c)
