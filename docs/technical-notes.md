@@ -1745,3 +1745,106 @@ action, match-score documentation, and the entry 8 hygiene cleanups.
 - "seek(0) twice: the file-pointer hygiene nobody tells you about"
 - "Throw away the filename: upload_to as a security boundary"
 - "Profile resume or per-application resume? Modelling what applicants actually do"
+
+---
+
+## Entry 19 — 2026-10-30 — Presigned resume downloads (commit `9b20ee8`)
+
+### Don't hand out URLs in representations; mint them on demand
+
+Entry 18's design had a quiet flaw worth fixing, and this commit fixes
+it: the application serializer embedded the resume's signed URL in
+every representation. A URL in a response is a bearer capability —
+whoever holds it (logs, caches, a forwarded screenshot, the wrong
+reader of the applicants list) can download the file until it expires,
+with no further authorization check. The new shape:
+
+```python
+# serializers.py — resume is write-only now; responses carry a boolean
+extra_kwargs = {"resume": {"required": True, "write_only": True}}
+has_resume = serializers.SerializerMethodField()   # bool(obj.resume)
+
+# views.py — a dedicated, permission-gated minting endpoint
+@action(detail=True, methods=["get"])
+def resume(self, request, pk=None):
+    application = self.get_object()                # IsApplicantOwner fires here
+    if not application.resume:
+        raise NotFound("This application has no resume.")
+    return Response({
+        "url": resume_download_url(application),
+        "expires_in": settings.RESUME_URL_EXPIRE_SECONDS,   # 300
+    })
+```
+
+- **Authorization happens at minting time.** The URL exists only
+  because a request just passed `IsApplicantOwner` (entry 14) — the
+  candidate who owns the application or the company that owns the job.
+  Representations share freely; capabilities don't leak through them.
+- **Five minutes, on purpose.** `RESUME_URL_EXPIRE_SECONDS = 300` is
+  long enough to click, short enough that a leaked link is nearly
+  worthless. The response states the expiry (`expires_in`) instead of
+  letting clients guess — contracts should say their own limits.
+
+### The two-endpoint problem, and why presigning is local
+
+```python
+# storage.py
+@lru_cache
+def _public_s3_client():
+    return boto3.client("s3",
+        endpoint_url=settings.AWS_S3_PUBLIC_ENDPOINT_URL,
+        region_name=settings.AWS_S3_REGION_NAME,
+        config=Config(signature_version="s3v4"))
+
+def resume_download_url(application):
+    return _public_s3_client().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": ..., "Key": application.resume.name,
+                "ResponseContentDisposition":
+                    f'attachment; filename="resume-{application.id}{ext}"'},
+        ExpiresIn=settings.RESUME_URL_EXPIRE_SECONDS)
+```
+
+```python
+# settings.py
+AWS_S3_ENDPOINT_URL        = env("AWS_S3_ENDPOINT_URL", "") or None
+AWS_S3_PUBLIC_ENDPOINT_URL = env("AWS_S3_PUBLIC_ENDPOINT_URL", "") or AWS_S3_ENDPOINT_URL
+```
+
+- **Presigned URLs are computed locally** — SigV4 signing is pure
+  cryptography over the request parameters; boto3 never calls S3 to
+  mint one (the commit title's "validate S3 signatures locally" point).
+  Consequence: the signature binds the *host* the URL will be used
+  against, so the host baked in at signing time is part of the
+  credential.
+- Hence **two endpoint settings**. Storage operations from inside
+  Compose use `http://localstack:4566` — a hostname only containers
+  can resolve. A URL signed for that host is dead on arrival in the
+  developer's browser. The public client signs for
+  `AWS_S3_PUBLIC_ENDPOINT_URL` (e.g. `http://localhost:4566`), falling
+  back to the internal endpoint when unset — which is exactly right
+  for production, where both are `None` and real S3 is the only host.
+  This is the single most common LocalStack integration bug, solved
+  at the right layer: configuration, not code branches.
+- **`ResponseContentDisposition: attachment`** makes the browser
+  download rather than render inline, under a sanitized name
+  (`resume-42.pdf`) — the UUID storage key from entry 18 stays an
+  internal detail, and recruiters' download folders stay readable.
+- `@lru_cache` on the client factory: boto3 clients are thread-safe
+  and comparatively expensive to construct; one per process is the
+  right granularity.
+
+### Status
+
+Resume flow is now complete end to end: validated upload (entry 18)
+→ private storage (entry 17) → owner-gated, short-lived download
+(this entry). Remaining smaller items: search & filters, the
+my-applications list, the close action, match-score documentation,
+entry 8 cleanups.
+
+### Article angles
+
+- "A URL in your API response is a bearer token: mint capabilities, don't embed them"
+- "The LocalStack presign trap: why your signed URL 404s from the host"
+- "SigV4 presigning is local math — and the host is part of the signature"
+- "expires_in: saying your contract's limits out loud"
