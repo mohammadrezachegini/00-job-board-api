@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-30 — Add presigned resume downloads; hide resume links from responses; validate S3 signatures locally (9b20ee8)
+- 2026-10-31 — docs: update changelog [skip changelog] (ab36fd1)
 - 2026-10-30 — docs: technical notes entry 18 — resume upload (571468c)
 - 2026-10-31 — docs: update changelog [skip changelog] (9516d80)
 - 2026-10-30 — docs: journal — resume upload with validation (74cb4da)
