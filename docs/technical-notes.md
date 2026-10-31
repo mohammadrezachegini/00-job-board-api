@@ -1651,3 +1651,97 @@ api:
 - "LocalStack in Compose: healthcheck on the bucket, not the process"
 - "Private by default for user files: ACL None, signed URLs, no overwrites"
 - "Configuration drift is a silent failure too: .env.example as contract documentation"
+
+---
+
+## Entry 18 — 2026-10-30 — Resume upload (commit `d6c618e`)
+
+### A deliberate divergence from the brief
+
+The brief put `resume` on CandidateProfile with a profile upload
+endpoint. This commit puts it on **Application** instead:
+
+```python
+# models.py
+resume = models.FileField(upload_to=resume_upload_path,
+                          validators=[validate_resume], blank=True)
+
+def resume_upload_path(instance, filename):
+    extentsion = Path(filename).suffix.lower()
+    return f"resume/job-{instance.job_id}/{uuid.uuid4().hex}{extentsion}"
+```
+
+and the serializer makes it `required: True` even though the model
+allows blank. The trade is worth naming: per-application resumes let a
+candidate tailor the file to the job (what real applicants do), at the
+cost of re-uploading per application and having no single "current
+resume" on the profile. The model/API split is also deliberate —
+`blank=True` keeps admin and fixtures flexible, while the API contract
+says an application without a resume is incomplete. Two layers, two
+audiences, again (entries 8/11).
+
+### Validation in three layers, cheapest first
+
+```python
+# validators.py
+MAX_RESUME_SIZE = 5 * 1024 * 1024
+RESUME_SIGNATURES = {".pdf": b"%PDF-", ".docx": b"PK\x03\x04"}
+
+def validate_resume(file):
+    extension = Path(file.name).suffix.lower()
+    if extension not in RESUME_SIGNATURES:
+        raise ValidationError("Only PDF and DOCX files are allowed.")
+    if file.size > MAX_RESUME_SIZE:
+        raise ValidationError("Resume file size should not exceed 5 MB.")
+    file.seek(0)
+    header = file.read(len(RESUME_SIGNATURES[extension]))
+    file.seek(0)
+    if header != RESUME_SIGNATURES[extension]:
+        raise ValidationError("Invalid file signature.")
+```
+
+- **Extension allowlist** — necessary, nowhere near sufficient: anyone
+  can rename `malware.exe` to `malware.pdf`.
+- **Size cap** from `file.size` metadata, before reading a single byte
+  of content.
+- **Magic-byte signature** — the file must actually *begin* as what
+  its name claims: `%PDF-` for PDF, `PK\x03\x04` (the ZIP container
+  signature) for DOCX. The `seek(0)` before *and after* reading is the
+  detail that makes it correct: the storage layer must receive the
+  stream rewound, or S3 gets a truncated file starting mid-header.
+- The validator hangs on the **model field**, not just the serializer,
+  so every write path — API, admin, shell, future worker — enforces
+  the same rules. Validation that lives only in one view is validation
+  with a back door.
+- Honest limit: the DOCX check proves "is a ZIP", not "is a Word
+  document" — a renamed plain ZIP passes. Proving more means opening
+  the archive and checking for `word/document.xml`; proportionate to
+  add if uploads ever become less trusted, overkill for this phase.
+  (And a cosmetic sighting: the local variable `extentsion` joins
+  `delf` in the harmless-typo collection.)
+
+### Stored names are a security decision
+
+`upload_to` discards the user's filename entirely: files land at
+`resume/job-<id>/<uuid4 hex>.<ext>` in the bucket. That one function
+removes whole bug classes — no collisions between users, no path
+traversal or hostile characters from filenames, no leaking the
+original filename (which often contains the candidate's full name) —
+and UUID names are unguessable, a second layer under the signed URLs
+from entry 17. The response exposes the file through the serializer's
+FileField, which produces a signed, expiring URL from the S3 backend:
+the company opens a resume via a capability link, not a public path.
+
+### Status
+
+The Phase 2 feature list is now complete in substance: permissions,
+ownership, status, match scoring, resume storage + upload. Remaining
+smaller items: search & filters, the my-applications list, the close
+action, match-score documentation, and the entry 8 hygiene cleanups.
+
+### Article angles
+
+- "Extension checks are a lie: magic-byte validation for uploads"
+- "seek(0) twice: the file-pointer hygiene nobody tells you about"
+- "Throw away the filename: upload_to as a security boundary"
+- "Profile resume or per-application resume? Modelling what applicants actually do"
