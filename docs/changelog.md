@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-30 — Add resume upload with type, signature and 5 MB checks, stored in S3 (d6c618e)
+- 2026-10-31 — docs: update changelog [skip changelog] (7bf0b42)
 - 2026-10-31 — docs: update changelog [skip changelog] (55f438c)
 - 2026-10-30 — docs: technical notes entry 17 — S3 storage backend via LocalStack (10acca3)
 - 2026-10-30 — docs: journal — LocalStack S3 storage backend (7c538b0)
