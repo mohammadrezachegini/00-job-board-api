@@ -220,3 +220,15 @@ This journal is updated as new work is pushed.
   tiny pure-Python module with no Django imports, ready to be unit
   tested in Phase 5. Technical breakdown in `docs/technical-notes.md`,
   entry 16.
+- 2026-10-30 (commit `27e7c68`, "Add LocalStack S3 and django-storages"):
+  the resume feature gets its foundation — file storage now points at
+  S3 through django-storages, emulated locally by a LocalStack
+  container (no AWS account, no cost). The bucket is created by an
+  init script, the API waits until the bucket actually exists before
+  starting, and the storage settings are private-by-default: signed
+  URLs, no public ACL, no silent overwrites. Switching to real AWS
+  later is pure configuration — the endpoint URL comes from an
+  environment variable. Not yet built: the resume field itself and the
+  upload endpoint. Review also found env-var name drift in
+  `.env.example` and a token that needs checking — details in
+  `docs/technical-notes.md`, entry 17.
