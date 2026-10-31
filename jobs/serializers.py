@@ -96,6 +96,9 @@ class JobSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+    
+    def validate_required_skills(self, value):
+        return list(dict.fromkeys([skill.strip().lower() for skill in value if skill.strip()]))
 
 
 class ApplicationSerializer(serializers.ModelSerializer):
@@ -122,13 +125,11 @@ class ApplicationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "status", "created_at", "updated_at"]
         validators = []
-        extra_kwargs = {
-            "resume": {"required": True, "write_only": True}
-        }
-        
+        extra_kwargs = {"resume": {"required": True, "write_only": True}}
+
     def get_has_resume(self, obj):
         return bool(obj.resume)
-    
+
     def get_match_score(self, obj):
         return matching.match_score(obj.job.required_skills, obj.candidate.skills)
 
@@ -155,7 +156,4 @@ class ApplicationStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Application
         fields = ["status"]
-        extra_kwargs = {
-            "status": {"required": True}
-        }
-
+        extra_kwargs = {"status": {"required": True}}

@@ -6,9 +6,12 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter, SearchFilter
 from .permissions import IsVerifiedCompany, IsCandidate, IsJobOwner, IsApplicantOwner
 from .storage import resume_download_url
 from .models import Application, Job
+from .filters import JobFilter
 from .serializers import (
     ApplicationSerializer,
     ApplicationStatusSerializer,
@@ -39,6 +42,11 @@ class JobViewSet(
 ):
 
     serializer_class = JobSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
+    filterset_class = JobFilter
+    search_fields = ["title", "description", "company__name"]
+    ordering_fields = ["created_at", "title"]
+    ordering = ["-created_at"]
 
     def get_permissions(self):
         if self.action == "create":

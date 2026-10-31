@@ -15,6 +15,7 @@ def _public_s3_client():
         config=Config(signature_version="s3v4"),
     )
 
+
 def resume_download_url(application):
     extension = Path(application.resume.name).suffix
     return _public_s3_client().generate_presigned_url(
@@ -22,7 +23,7 @@ def resume_download_url(application):
         Params={
             "Bucket": settings.AWS_STORAGE_BUCKET_NAME,
             "Key": application.resume.name,
-            "ResponseContentDisposition": f'attachment; filename=\"resume-{application.id}{extension}"'
+            "ResponseContentDisposition": f'attachment; filename="resume-{application.id}{extension}"',
         },
         ExpiresIn=settings.RESUME_URL_EXPIRE_SECONDS,  # URL expiration time in seconds
     )
