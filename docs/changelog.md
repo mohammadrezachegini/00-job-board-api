@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-30 — docs: technical notes entry 20 — search, filters, ordering (2e11073)
+- 2026-10-31 — docs: update changelog [skip changelog] (2ef85dd)
 - 2026-10-30 — docs: journal — job search, filters, ordering (82b76b8)
 - 2026-10-31 — docs: update changelog [skip changelog] (7f4cbd8)
 - 2026-10-30 — Add job search, filters (type, location, skills) and ordering; normalise job skills on save (e860e22)
