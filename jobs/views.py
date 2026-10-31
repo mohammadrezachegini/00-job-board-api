@@ -1,11 +1,13 @@
 from django.db import IntegrityError, transaction
+from django.conf import settings
 from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
 from .permissions import IsVerifiedCompany, IsCandidate, IsJobOwner, IsApplicantOwner
-
+from .storage import resume_download_url
 from .models import Application, Job
 from .serializers import (
     ApplicationSerializer,
@@ -76,7 +78,7 @@ class ApplicationViewSet(
     def get_permissions(self):
         if self.action == "create":
             return [IsAuthenticated(), IsCandidate()]
-        if self.action == "retrieve":
+        if self.action in ("retrieve", "resume"):
             return [IsAuthenticated(), IsApplicantOwner()]
         if self.action == "set_status":
             return [IsAuthenticated(), IsJobOwner()]
@@ -102,3 +104,15 @@ class ApplicationViewSet(
                 application, context=self.get_serializer_context()
             ).data
         )
+    
+    @action(detail=True, methods=["get"])
+    def resume(self, request, pk=None):
+        application = self.get_object()
+        if not application.resume:
+            raise NotFound("This application has no resume.")
+        return Response({
+            "url": resume_download_url(application),
+            "expires_in": settings.RESUME_URL_EXPIRE_SECONDS
+        })
+        
+

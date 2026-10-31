@@ -103,6 +103,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
     job_title = serializers.CharField(source="job.title", read_only=True)
     candidate = serializers.CharField(source="candidate.user.username", read_only=True)
     match_score = serializers.SerializerMethodField()
+    has_resume = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -113,6 +114,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "candidate",
             "cover_letter",
             "resume",
+            "has_resume",
             "status",
             "match_score",
             "created_at",
@@ -121,8 +123,11 @@ class ApplicationSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "status", "created_at", "updated_at"]
         validators = []
         extra_kwargs = {
-            "resume": {"required": True}
+            "resume": {"required": True, "write_only": True}
         }
+        
+    def get_has_resume(self, obj):
+        return bool(obj.resume)
     
     def get_match_score(self, obj):
         return matching.match_score(obj.job.required_skills, obj.candidate.skills)
@@ -153,3 +158,4 @@ class ApplicationStatusSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "status": {"required": True}
         }
+
