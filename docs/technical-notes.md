@@ -1848,3 +1848,84 @@ entry 8 cleanups.
 - "The LocalStack presign trap: why your signed URL 404s from the host"
 - "SigV4 presigning is local math — and the host is part of the signature"
 - "expires_in: saying your contract's limits out loud"
+
+---
+
+## Entry 20 — 2026-10-30 — Search, filters, ordering (commit `e860e22`)
+
+### Three backends, one list endpoint
+
+```python
+filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
+filterset_class = JobFilter
+search_fields = ["title", "description", "company__name"]
+ordering_fields = ["created_at", "title"]
+ordering = ["-created_at"]
+```
+
+```python
+class JobFilter(django_filters.FilterSet):
+    location = django_filters.CharFilter(lookup_expr="icontains")
+    skills = django_filters.CharFilter(method="filter_skills")
+
+    class Meta:
+        model = Job
+        fields = ["job_type", "location", "skills"]
+
+    def filter_skills(self, queryset, name, value):
+        skills = [s.strip().lower() for s in value.split(",") if s.strip()]
+        if not skills:
+            return queryset
+        return queryset.filter(required_skills__overlap=skills)
+```
+
+- **Each tool does its own job.** django-filter handles structured
+  filtering (`?job_type=full_time&location=van`), DRF's `SearchFilter`
+  handles free text (`?search=` → icontains OR-ed across title,
+  description, and company name), `OrderingFilter` whitelists sortable
+  fields (`?ordering=title`) over a sane default (`-created_at`). The
+  three compose in a single request — filter AND search AND order —
+  because each backend only narrows or arranges the queryset.
+  `ordering_fields` as a whitelist matters: clients can sort by what
+  is offered, not by arbitrary columns.
+- **Skills filtering is a PostgreSQL conversation.** `?skills=python,django`
+  becomes `required_skills__overlap=[...]` — the array overlap
+  operator (`&&`): jobs requiring **any** of the listed skills.
+  ANY-match is the right discovery semantic (ALL-match hides a job
+  needing python+go from a python developer), and it is worth stating
+  consciously, because `__contains` (ALL) is one word away and means
+  something very different. An empty `skills=` degrades to unfiltered
+  rather than erroring.
+- **The invariant that makes it work: normalize at write.** Array
+  overlap is exact element comparison — a job stored with `"Python"`
+  would *never* match a query for `"python"`. So
+  `JobSerializer.validate_required_skills` canonicalizes on the way
+  in (strip, lowercase, drop blanks, de-duplicate order-preservingly
+  via `dict.fromkeys`), the filter canonicalizes the query identically,
+  and `matching.normalize_skills` (entry 16) canonicalizes at scoring
+  time. Three call sites, one rule, and the database stays clean
+  enough for exact operators. Write-time normalization beats
+  read-time forgiveness: fix the data once, query it cheaply forever.
+  One asymmetry remains — candidate skills from registration aren't
+  normalized at write. Scoring doesn't care (it normalizes in
+  memory), and nothing queries candidate skills by array operators,
+  so it is cosmetic today; the day a "candidates matching X" query
+  appears, it becomes a bug of exactly the shape this commit fixed
+  on the job side.
+
+### Status
+
+Job discovery is complete per the brief. The candidates' side of the
+brief's search night — a my-applications list with a `?status=`
+filter — is still unbuilt: `ApplicationViewSet` has no list action at
+all, making the my-applications list the longest-carried open item in
+the project (first flagged in entry 11). Also still open: the job
+close action, Redis caching (planned Oct 29, no commit yet), the
+match-score docstring, and entry 8's cleanups.
+
+### Article angles
+
+- "Normalize at write, query exactly: making PostgreSQL array operators usable"
+- "ANY vs ALL: the one-word difference between overlap and contains"
+- "Three filter backends walk into a viewset: composing DRF query features"
+- "Ordering whitelists: the sort parameter is an attack surface too"
