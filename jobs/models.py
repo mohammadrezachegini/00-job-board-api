@@ -1,7 +1,10 @@
+import uuid
+from pathlib import Path
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from .validators import validate_resume
 
 
 class User(AbstractUser):
@@ -85,6 +88,11 @@ class Job(models.Model):
         return f"{self.title} ({self.company})"
 
 
+def resume_upload_path(instance, filename):
+    extentsion = Path(filename).suffix.lower()
+    return f"resume/job-{instance.job_id}/{uuid.uuid4().hex}{extentsion}"
+
+
 class Application(models.Model):
     class Status(models.TextChoices):
         SUBMITTED = "submitted", "Submitted"
@@ -94,16 +102,23 @@ class Application(models.Model):
         REJECTED = "rejected", "Rejected"
 
     job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="applications")
-    candidate = models.ForeignKey(CandidateProfile, on_delete=models.CASCADE, related_name="applications")
+    candidate = models.ForeignKey(
+        CandidateProfile, on_delete=models.CASCADE, related_name="applications"
+    )
     cover_letter = models.TextField(blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SUBMITTED)
+    resume = models.FileField(upload_to=resume_upload_path, validators=[validate_resume], blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.SUBMITTED
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
         constraints = [
-            models.UniqueConstraint(fields=["job", "candidate"], name="unique_application_per_job"),
+            models.UniqueConstraint(
+                fields=["job", "candidate"], name="unique_application_per_job"
+            ),
         ]
 
     def __str__(self):

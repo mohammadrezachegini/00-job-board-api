@@ -112,6 +112,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "job_title",
             "candidate",
             "cover_letter",
+            "resume",
             "status",
             "match_score",
             "created_at",
@@ -119,6 +120,9 @@ class ApplicationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "status", "created_at", "updated_at"]
         validators = []
+        extra_kwargs = {
+            "resume": {"required": True}
+        }
     
     def get_match_score(self, obj):
         return matching.match_score(obj.job.required_skills, obj.candidate.skills)
