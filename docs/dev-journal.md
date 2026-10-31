@@ -241,3 +241,13 @@ This journal is updated as new work is pushed.
   stored in the S3 backend from entry 17 under an unguessable
   UUID name, and required by the API on every application. Technical
   breakdown in `docs/technical-notes.md`, entry 18.
+- 2026-10-30 (commit `9b20ee8`, "Add presigned resume downloads"):
+  resume access is redesigned the careful way. Application responses
+  no longer contain a resume URL at all — just `has_resume: true` —
+  and the actual file is served through a dedicated endpoint,
+  `GET /api/applications/{id}/resume/`, which checks ownership and
+  returns a download link that expires in five minutes. The link is
+  signed against a separate "public" endpoint setting, which solves
+  the classic local-development trap where a URL signed for
+  `localstack:4566` can't be opened from the host browser. Technical
+  breakdown in `docs/technical-notes.md`, entry 19.
