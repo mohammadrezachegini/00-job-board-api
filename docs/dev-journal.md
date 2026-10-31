@@ -232,3 +232,12 @@ This journal is updated as new work is pushed.
   upload endpoint. Review also found env-var name drift in
   `.env.example` and a token that needs checking — details in
   `docs/technical-notes.md`, entry 17.
+- 2026-10-30 (commit `d6c618e`, "Add resume upload with type, signature
+  and 5 MB checks"): candidates now attach a resume when applying.
+  Design note: the resume lives on the Application, not the profile —
+  one tailored resume per application instead of a single shared file.
+  The upload is validated three ways (extension allowlist, 5 MB cap,
+  and a magic-byte signature check so a renamed file can't slip past),
+  stored in the S3 backend from entry 17 under an unguessable
+  UUID name, and required by the API on every application. Technical
+  breakdown in `docs/technical-notes.md`, entry 18.
