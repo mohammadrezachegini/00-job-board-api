@@ -1557,3 +1557,97 @@ close action, and the entry 8 serializer hygiene items.
 - "Normalization is the feature: why matching quality lives in strip().lower()"
 - "null beats 100: honest semantics for undefined scores"
 - "Computed vs stored: deriving values that can never go stale"
+
+---
+
+## Entry 17 — 2026-10-30 — S3 storage backend via LocalStack (commit `27e7c68`)
+
+### Emulate the cloud, configure the real thing
+
+```python
+# settings.py
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME")            # required
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", "us-east-1")
+AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", "") or None        # ← the seam
+AWS_DEFAULT_ACL = None
+AWS_S3_FILE_OVERWRITE = False
+AWS_QUERYSTRING_AUTH = True
+
+STORAGES = {
+    "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+```
+
+```yaml
+# docker-compose.yml (excerpt)
+localstack:
+  image: localstack/localstack:2026.10.4
+  environment: [SERVICES=s3, ...]
+  volumes: ["./localstack/init/ready.d:/etc/localstack/init/ready.d:ro"]
+  healthcheck: awslocal s3api head-bucket --bucket $AWS_STORAGE_BUCKET_NAME
+api:
+  depends_on:
+    db: {condition: service_healthy}
+    localstack: {condition: service_healthy}
+```
+
+- **The endpoint URL is the whole portability story.** django-storages
+  + boto3 talk to anything that speaks the S3 API; `AWS_S3_ENDPOINT_URL`
+  decides where that is — `http://localstack:4566` in dev, empty
+  (→ `None`) against real AWS. *No code changes* between laptop and
+  cloud, which is exactly the seam Phase 4's Azure Blob swap and
+  Project 01's real deployment will reuse. LocalStack gives that a
+  free, offline, resettable stand-in: S3 only (`SERVICES=s3`) keeps it
+  light.
+- **Bucket lifecycle is Compose's job.** A `ready.d` init script
+  (`awslocal s3 mb s3://$AWS_STORAGE_BUCKET_NAME`, fail-fast shell
+  options) creates the bucket once LocalStack is ready; the same env
+  var names the bucket in settings, the init script, and the
+  healthcheck — one source of truth. The healthcheck is a
+  `head-bucket` against the *actual bucket*, and `api` waits for
+  `service_healthy` on both infrastructure services, so the first
+  upload can never race bucket creation.
+- **Private by default, again** (the project's recurring posture):
+  `AWS_DEFAULT_ACL = None` (objects are not public), signed URLs via
+  `AWS_QUERYSTRING_AUTH` (access is a capability with an expiry, the
+  right shape for resumes), and `FILE_OVERWRITE = False` so two
+  candidates uploading `resume.pdf` get distinct stored names instead
+  of one silently replacing the other.
+- Scope honesty: this commit is the **backend only** — there is no
+  `resume` FileField yet (migrations still end at `0004`) and no
+  upload endpoint or type/size validation. Those are the feature's
+  next steps; the storage layer they will stand on is ready.
+
+### Findings
+
+1. **Env-var name drift in `.env.example`.** It defines
+   `AWS_S3_REGION` but settings read `AWS_S3_REGION_NAME`; it defines
+   `LOCAL_STACK_AUTH_TOKEN` but Compose expects
+   `LOCALSTACK_AUTH_TOKEN`. Both fail *silently* today — the region
+   falls back to a default that happens to equal the intended value —
+   which is entry 12's silent-failure pattern in configuration form:
+   the day someone changes the region in `.env`, nothing happens, and
+   nothing says why. Names are contracts; the example file is the
+   contract's documentation.
+2. **Check the auth token's home.** `docker-compose.yml` appears to
+   carry a literal LocalStack auth-token value, and `.env.example`
+   carries a token-shaped value too (both are masked in my tooling, so
+   I cannot tell placeholders from real values). If either is real:
+   it belongs in `.env` (gitignored), not in a committed file —
+   especially not in `.env.example`, whose entire purpose is to be
+   copied and shared. This is precisely what the Gitleaks step in
+   Project 01 will scan for.
+3. **Init script idempotency.** `s3 mb` errors when the bucket
+   already exists (e.g. a container restart that preserves
+   LocalStack's state); with `set -e` the script then fails on every
+   subsequent boot. A `head-bucket || mb` guard makes it a true
+   no-op-when-done, matching the Ansible idempotency standard from
+   Nights 1–2.
+
+### Article angles
+
+- "One env var is the whole cloud strategy: endpoint-URL portability with django-storages"
+- "LocalStack in Compose: healthcheck on the bucket, not the process"
+- "Private by default for user files: ACL None, signed URLs, no overwrites"
+- "Configuration drift is a silent failure too: .env.example as contract documentation"
