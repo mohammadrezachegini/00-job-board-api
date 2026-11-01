@@ -274,3 +274,13 @@ This journal is updated as new work is pushed.
   dependency. Responses carry an `X-Cache: HIT/MISS` header so the
   behaviour is provable from outside. Technical breakdown in
   `docs/technical-notes.md`, entry 22.
+- 2026-10-31 (commit `a127b5c`, "Add SQS queue + DLQ in LocalStack and
+  cloud.queue interface"): the background-work foundation lands.
+  LocalStack now also emulates SQS, with two queues created at
+  startup: the main notifications queue and a dead-letter queue that
+  receives any message that fails processing three times. Application
+  code talks to a new provider-neutral `cloud.queue` interface — a
+  small abstract class with a message dataclass — so swapping SQS
+  for Azure Service Bus later means one new implementation, not a
+  rewrite. The producer, worker and message formats come next.
+  Technical breakdown in `docs/technical-notes.md`, entry 23.
