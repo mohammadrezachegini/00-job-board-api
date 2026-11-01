@@ -56,6 +56,8 @@ AWS_S3_FILE_OVERWRITE = False
 AWS_QUERYSTRING_AUTH = True
 AWS_S3_PUBLIC_ENDPOINT_URL = env("AWS_S3_PUBLIC_ENDPOINT_URL", "") or AWS_S3_ENDPOINT_URL
 RESUME_URL_EXPIRE_SECONDS = 300
+JOB_LIST_CACHE_SECONDS = 60
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -114,6 +116,14 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env("REDIS_URL"),
+        "KEY_PREFIX": "jobboard",
+        "TIMEOUT": 300,
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

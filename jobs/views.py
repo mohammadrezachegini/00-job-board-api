@@ -12,6 +12,14 @@ from .permissions import IsVerifiedCompany, IsCandidate, IsJobOwner, IsApplicant
 from .storage import resume_download_url
 from .models import Application, Job
 from .filters import JobFilter
+
+import logging
+
+from django.core.cache import cache
+from redis.exceptions import RedisError
+
+from .cache import job_list_cache_key
+
 from .serializers import (
     ApplicationSerializer,
     ApplicationStatusSerializer,
@@ -19,6 +27,8 @@ from .serializers import (
     CompanyRegistrationSerializer,
     JobSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CompanyRegisterView(generics.CreateAPIView):
@@ -76,6 +86,28 @@ class JobViewSet(
         )
         return self.get_paginated_response(serializer.data)
 
+    def list(self, request, *args, **kwargs):
+        try:
+            key = job_list_cache_key(request)
+            cached = cache.get(key)
+        except RedisError:
+            logger.warning("Job list cache unavailable", exc_info=True)
+            return super().list(request, *args, **kwargs)
+
+        if cached is not None:
+            response = Response(cached)
+            response["X-Cache"] = "HIT"
+            return response
+
+        response = super().list(request, *args, **kwargs)
+        if response.status_code == 200:
+            try:
+                cache.set(key, response.data, timeout=settings.JOB_LIST_CACHE_SECONDS)
+            except RedisError:
+                logger.warning("Could not store job list in cache", exc_info=True)
+        response["X-Cache"] = "MISS"
+        return response
+
 
 class ApplicationViewSet(
     mixins.CreateModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
@@ -112,15 +144,15 @@ class ApplicationViewSet(
                 application, context=self.get_serializer_context()
             ).data
         )
-    
+
     @action(detail=True, methods=["get"])
     def resume(self, request, pk=None):
         application = self.get_object()
         if not application.resume:
             raise NotFound("This application has no resume.")
-        return Response({
-            "url": resume_download_url(application),
-            "expires_in": settings.RESUME_URL_EXPIRE_SECONDS
-        })
-        
-
+        return Response(
+            {
+                "url": resume_download_url(application),
+                "expires_in": settings.RESUME_URL_EXPIRE_SECONDS,
+            }
+        )

@@ -26,6 +26,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+  
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   api:
     build: .
@@ -40,6 +48,8 @@ services:
       db:
         condition: service_healthy
       localstack:
+        condition: service_healthy
+      redis:
         condition: service_healthy
   
   
