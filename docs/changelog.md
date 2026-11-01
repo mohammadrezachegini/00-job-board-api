@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-31 — Cache job list in Redis with versioned keys, signal invalidation on commit, graceful fallback (0ce85a6)
+- 2026-10-31 — Update README for Phase 2 (f83b78f)
+- 2026-10-31 — docs: update changelog [skip changelog] (623481e)
 - 2026-10-30 — docs: technical notes entry 20 — search, filters, ordering (2e11073)
 - 2026-10-31 — docs: update changelog [skip changelog] (2ef85dd)
 - 2026-10-30 — docs: journal — job search, filters, ordering (82b76b8)
