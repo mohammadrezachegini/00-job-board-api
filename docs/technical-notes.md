@@ -1929,3 +1929,138 @@ match-score docstring, and entry 8's cleanups.
 - "ANY vs ALL: the one-word difference between overlap and contains"
 - "Three filter backends walk into a viewset: composing DRF query features"
 - "Ordering whitelists: the sort parameter is an attack surface too"
+
+---
+
+## Entry 21 — 2026-10-31 — README updated for Phase 2 (commit `f83b78f`)
+
+A short entry for a documentation habit worth keeping: at the phase
+boundary, the README was rewritten to match the system as built —
+status ("Phase 2 (business logic and permissions) complete"), an
+updated one-line description naming permissions, match scoring, S3
+resumes and search, and the honest remainder (worker, operations
+endpoints, tests, cloud deployment still to come). Documentation
+updated at the moment the work lands ages well; documentation updated
+"later" describes a system that no longer exists. (One lag: the Redis
+caching in entry 22 landed the same evening, after this README pass —
+the next sync should add it.)
+
+---
+
+## Entry 22 — 2026-10-31 — Redis caching with versioned keys (commit `0ce85a6`)
+
+### Cache invalidation: don't delete keys, retire a generation
+
+```python
+# jobs/cache.py
+JOB_LIST_VERSION_KEY = "jobs:list:version"
+
+def job_list_cache_key(request):
+    params = sorted(request.query_params.lists())
+    digest = hashlib.sha256(f"{request.get_host()}|{params}".encode()).hexdigest()
+    return f"jobs:list:v{_current_version()}:{digest}"
+
+def invalidate_job_list():
+    def bump():
+        try:
+            cache.incr(JOB_LIST_VERSION_KEY)
+        except ValueError:
+            cache.add(JOB_LIST_VERSION_KEY, int(time.time()), timeout=None)
+        except RedisError:
+            logger.warning("Could not invalidate the job list cache", exc_info=True)
+    transaction.on_commit(bump)
+```
+
+Three decisions carry the design:
+
+- **A version counter instead of key deletion.** Filter/search/page
+  combinations make the keyspace unbounded — you cannot enumerate
+  what to delete. Instead every list key embeds a generation number;
+  invalidation increments the generation and every old key becomes
+  unreachable garbage that its 60-second TTL reaps. Delete-by-oblivion:
+  O(1), race-free, no key scans in production Redis.
+- **The counter starts at `int(time.time())`, not 1.** If Redis is
+  flushed or restarted, a counter restarting at 1 could collide with
+  surviving keys from a previous life (or another environment sharing
+  the instance). An epoch-seconds starting value makes generations
+  monotonically unique across incarnations — a one-line defence
+  against a failure mode most implementations never think of.
+  `cache.add` (set-if-absent) makes the lazy initialisation
+  race-safe between workers.
+- **Invalidation waits for commit.** Signals fire on save, but the
+  bump is registered with `transaction.on_commit`: if the surrounding
+  transaction rolls back, the cache is *not* invalidated for a change
+  that never happened; if it commits, no reader can refill the cache
+  with pre-commit data in the gap. Signals without `on_commit` are
+  the classic source of "the cache shows data that doesn't exist /
+  doesn't show data that does" bugs.
+
+### Signals watch the neighbours too
+
+`jobs/signals.py` hooks `post_save`/`post_delete` for **Job and
+Company** (wired in `AppsConfig.ready()`). Company is the perceptive
+inclusion: the job list payload embeds `company.name`, so a company
+rename changes list content without any Job row changing. Watching
+only the model you cache is the standard miss; watching the models
+whose data *appears in* the cached payload is the correct rule.
+Known limit: bulk `QuerySet.update()` bypasses signals entirely —
+the 60 s TTL is the backstop, which is exactly why TTL and versioning
+are both present.
+
+### Graceful fallback: the cache may die, the API may not
+
+```python
+def list(self, request, *args, **kwargs):
+    try:
+        key = job_list_cache_key(request)
+        cached = cache.get(key)
+    except RedisError:
+        logger.warning("Job list cache unavailable", exc_info=True)
+        return super().list(request, *args, **kwargs)
+    if cached is not None:
+        response = Response(cached); response["X-Cache"] = "HIT"; return response
+    response = super().list(request, *args, **kwargs)
+    if response.status_code == 200:
+        try: cache.set(key, response.data, timeout=settings.JOB_LIST_CACHE_SECONDS)
+        except RedisError: logger.warning(...)
+    response["X-Cache"] = "MISS"
+    return response
+```
+
+Every Redis touch is wrapped; failures log and degrade to plain
+database reads. Only 200s are cached (an error must never become the
+cached answer), the paginated payload is cached per exact query
+string (each filter/search/page combination its own entry), and the
+`X-Cache: HIT/MISS` header makes the whole mechanism externally
+provable — the brief's acceptance test is literally "make the same
+request twice and diff the headers." Keys deliberately exclude the
+user: the job list payload is identical for every authenticated
+reader, so one entry serves all — safe *because* the serializer has
+no per-user fields, a property to re-check if that ever changes.
+
+Infrastructure notes: Redis 7.4 (alpine) joins Compose with a
+`redis-cli ping` healthcheck, `REDIS_URL` comes from env with the
+usual fail-fast, and Django's built-in `RedisCache` backend + the
+`redis` client are used — no django-redis dependency needed for this
+scope. Also visible in Compose now: LocalStack publishes
+`127.0.0.1:4566` (loopback only — the public presign endpoint from
+entry 19 made reachable from the host, without exposing it to the
+network) and runs with `S3_SKIP_SIGNATURE_VALIDATION=0`, so local
+signature behaviour matches real AWS instead of silently accepting
+anything.
+
+### Status
+
+Phase 3 Step 1 (brief Night 15) is complete: Redis in Compose,
+versioned job-list caching, signal + on-commit invalidation, graceful
+fallback. Remaining known items: the my-applications list and close
+action (Phase 2 leftovers), the background worker + idempotency
+(Phase 3's next steps), match-score docstring, entry 8 cleanups.
+
+### Article angles
+
+- "Don't delete cache keys — retire a generation: versioned invalidation"
+- "transaction.on_commit: the signal handler's missing half"
+- "Start your counter at time.time(): cache generations across Redis restarts"
+- "Cache the payload's dependencies, not just its model: why Company signals matter"
+- "Graceful fallback as a design rule: the cache may die, the API may not"
