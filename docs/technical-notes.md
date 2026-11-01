@@ -2064,3 +2064,105 @@ action (Phase 2 leftovers), the background worker + idempotency
 - "Start your counter at time.time(): cache generations across Redis restarts"
 - "Cache the payload's dependencies, not just its model: why Company signals matter"
 - "Graceful fallback as a design rule: the cache may die, the API may not"
+
+---
+
+## Entry 23 — 2026-10-31 — Queue interface + SQS with DLQ (commit `a127b5c`)
+
+### A provider-neutral seam, drawn before the worker exists
+
+```python
+# cloud/queue.py
+@dataclass(frozen=True)
+class QueueMessage:
+    id: str
+    body: dict            # already JSON-parsed at the boundary
+    receipt_handle: str
+
+class Queue(ABC):
+    @abstractmethod
+    def send(self, body: dict) -> str: ...
+    @abstractmethod
+    def receive(self, max_messages: int = 10, wait_seconds: int = 20) -> list[QueueMessage]: ...
+    @abstractmethod
+    def delete(self, message: QueueMessage) -> None: ...
+
+class SQSQueue(Queue): ...   # boto3 against AWS_SQS_ENDPOINT_URL
+
+@lru_cache(maxsize=1)
+def get_queue() -> Queue:
+    return SQSQueue(settings.SQS_QUEUE_NAME)
+```
+
+- **The interface hides the provider's vocabulary.** Callers will
+  think in `dict` bodies and `QueueMessage`s; SQS-isms (MessageId,
+  ReceiptHandle, JSON string bodies) exist only inside `SQSQueue`,
+  which serializes on send and parses on receive. That boundary is
+  the entire Phase 4 strategy (Azure Service Bus = one new class
+  implementing three methods) purchased in advance, cheaply. (The
+  brief sketched a `Protocol`; an ABC was used instead — structural
+  vs nominal typing. ABC enforces the contract at instantiation and
+  reads clearly; the cost is that the future Azure class must
+  explicitly inherit. Equivalent for this codebase, worth choosing
+  consciously.)
+- **Eager URL resolution in `__init__`** — `get_queue_url` fails fast
+  if the queue doesn't exist, and Compose's healthcheck (extended to
+  `sqs get-queue-url`) guarantees it does before the API starts. The
+  `lru_cache`d `get_queue()` factory mirrors the storage client
+  pattern from entry 19: one client per process, built once.
+- **Defaults encode the right polling shape**: batches of 10 and
+  20-second long polling — the worker step won't busy-spin against
+  the queue.
+
+### The DLQ is created first, on purpose
+
+```bash
+# localstack/init/ready.d/create-queues.sh
+dlq_url=$(awslocal sqs create-queue --queue-name "${SQS_QUEUE_NAME}-dlq" ...)
+dlq_arn=$(awslocal sqs get-queue-attributes --queue-url "$dlq_url" ...)
+# main queue: VisibilityTimeout 30, RedrivePolicy {deadLetterTargetArn, maxReceiveCount: 3}
+awslocal sqs create-queue --queue-name "${SQS_QUEUE_NAME}" --attributes file:///tmp/queue-attributes.json
+```
+
+A message that keeps failing gets received, returns after the 30 s
+visibility timeout, and after **3 receives** SQS itself moves it to
+the dead-letter queue — poison messages stop blocking the line but
+are preserved for inspection instead of vanishing. Wiring this at
+provisioning time (not "later, when there's a worker") means the
+failure path exists before the first message ever flows. Unlike the
+bucket script, `create-queue` is naturally idempotent — same name
+and attributes returns the existing queue — so restarts are boring.
+Compose adds its own fail-fast: `${SQS_QUEUE_NAME:?set ...}` refuses
+to start with a clear message when the variable is missing, and
+`SERVICES=s3,sqs` scopes LocalStack to exactly two services.
+
+Notes for the worker step that follows:
+
+- The interface has **no visibility-extension method** yet. If a
+  handler ever runs longer than 30 s, its message reappears
+  mid-processing and gets handled twice — the idempotency rules of
+  the next step are the real defence, and a
+  `change_message_visibility` method is the escape hatch if needed.
+- `receive()` parses every body as JSON in one comprehension: one
+  malformed (non-JSON) message in a batch would raise and take the
+  whole batch down with it. Own-code producers always send JSON, so
+  the exposure is small — per-message error isolation belongs in the
+  worker loop.
+- Two region settings now exist — `AWS_S3_REGION_NAME` (storage,
+  presigning) and the new `AWS_REGION` (queue). Both are read
+  correctly, but they can silently disagree; one shared region
+  variable would remove a config-drift foot-gun (entry 17's family).
+
+### Status
+
+Queue infrastructure is ready: interface, SQS implementation, DLQ
+with redrive, healthcheck gating. Next: the producer side (publishing
+application events on commit) and the worker itself with idempotent
+handlers.
+
+### Article angles
+
+- "Buy the port before the ship: provider-neutral interfaces in a Django monolith"
+- "Dead-letter queues: designing the failure path before the first message"
+- "ABC vs Protocol in Python: choosing your contract style on purpose"
+- "maxReceiveCount and visibility timeouts: the two numbers that define your retry policy"
