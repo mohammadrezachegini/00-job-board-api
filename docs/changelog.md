@@ -2,6 +2,7 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-01 — docs: update changelog [skip changelog] (6c68e01)
 - 2026-10-31 — docs: technical notes entries 21-22 — Phase 2 README; Redis versioned caching (049d8e5)
 - 2026-10-31 — docs: journal — Phase 2 README + Redis job-list caching (0ce0d51)
 - 2026-11-01 — docs: update changelog [skip changelog] (693fc2c)
