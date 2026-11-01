@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-10-31 — docs: journal — SQS queue + DLQ, cloud.queue interface (060ba4b)
+- 2026-11-01 — docs: update changelog [skip changelog] (700cabf)
 - 2026-10-31 — Add SQS queue + DLQ in LocalStack and cloud.queue interface (a127b5c)
 - 2026-11-01 — docs: update changelog [skip changelog] (a95ce2d)
 - 2026-11-01 — docs: update changelog [skip changelog] (6c68e01)
