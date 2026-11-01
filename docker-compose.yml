@@ -15,14 +15,15 @@ services:
     ports:
       - "127.0.0.1:4566:4566"
     environment:
-      - SERVICES=s3
+      - SERVICES=s3,sqs
       - S3_SKIP_SIGNATURE_VALIDATION=0
       - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:?set LOCALSTACK_AUTH_TOKEN in .env}
       - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
+      - SQS_QUEUE_NAME=${SQS_QUEUE_NAME:?set SQS_QUEUE_NAME in .env}
     volumes:
       - ./localstack/init/ready.d:/etc/localstack/init/ready.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "awslocal s3api head-bucket --bucket $${AWS_STORAGE_BUCKET_NAME}"]
+      test: ["CMD-SHELL", "awslocal s3api head-bucket --bucket $${AWS_STORAGE_BUCKET_NAME} && awslocal sqs get-queue-url --queue-name $${SQS_QUEUE_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 20
