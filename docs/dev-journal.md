@@ -260,3 +260,17 @@ This journal is updated as new work is pushed.
   a job is saved, and the skills filter normalises the query the same
   way — so `Python` the posting and `python` the search actually meet.
   Technical breakdown in `docs/technical-notes.md`, entry 20.
+- 2026-10-31 (commit `f83b78f`, "Update README for Phase 2"): the
+  README catches up with reality — status line now reads Phase 2
+  complete, and the feature list covers permissions, match scoring,
+  S3 resumes and search. Keeping the public documentation in sync at
+  phase boundaries is part of the build, not an afterthought.
+- 2026-10-31 (commit `0ce85a6`, "Cache job list in Redis"): Phase 3
+  opens with response caching for the job list. Redis joins the
+  Compose stack; list responses are cached for 60 seconds under a
+  versioned key, writes bump the version (only after the database
+  transaction commits), and if Redis is down the API quietly falls
+  back to the database — the cache is an accelerator, never a
+  dependency. Responses carry an `X-Cache: HIT/MISS` header so the
+  behaviour is provable from outside. Technical breakdown in
+  `docs/technical-notes.md`, entry 22.
