@@ -28,6 +28,22 @@ services:
       timeout: 5s
       retries: 20
   
+  worker:
+    build: .
+    command: ["python", "-m", "worker.run_worker"]
+    env_file: .env
+    environment:
+      - POSTGRES_HOST=db
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    stop_grace_period: 30s
+
+  
   redis:
     image: redis:7.4-alpine
     healthcheck:

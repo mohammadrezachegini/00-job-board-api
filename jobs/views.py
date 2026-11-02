@@ -12,6 +12,7 @@ from .permissions import IsVerifiedCompany, IsCandidate, IsJobOwner, IsApplicant
 from .storage import resume_download_url
 from .models import Application, Job
 from .filters import JobFilter
+from .events import publish_status_changed
 
 import logging
 
@@ -136,14 +137,13 @@ class ApplicationViewSet(
     @action(detail=True, methods=["patch"], url_path="status")
     def set_status(self, request, pk=None):
         application = self.get_object()
+        old_status = application.status
         serializer = ApplicationStatusSerializer(application, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(
-            ApplicationSerializer(
-                application, context=self.get_serializer_context()
-            ).data
-        )
+        if application.status != old_status:
+            publish_status_changed(application, old_status)
+        return Response(ApplicationSerializer(application, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["get"])
     def resume(self, request, pk=None):
