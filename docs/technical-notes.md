@@ -2166,3 +2166,113 @@ handlers.
 - "Dead-letter queues: designing the failure path before the first message"
 - "ABC vs Protocol in Python: choosing your contract style on purpose"
 - "maxReceiveCount and visibility timeouts: the two numbers that define your retry policy"
+
+---
+
+## Entry 24 — 2026-11-01 — Event publishing + the worker (commit `9d210da`)
+
+### Producer: publish on commit, only on real change
+
+```python
+# views.py — inside set_status
+old_status = application.status
+serializer.save()  # (validated ApplicationStatusSerializer)
+if application.status != old_status:
+    publish_status_changed(application, old_status)
+
+# jobs/events.py
+def publish_status_changed(application, old_status):
+    body = {"type": "application.status_changed",
+            "event_id": str(uuid.uuid4()),
+            "application_id": application.id,
+            "old_status": old_status,
+            "new_status": application.status}
+    def send():
+        try:
+            get_queue().send(body)
+        except (BotoCoreError, ClientError):
+            logger.exception("Could not queue ...")
+    transaction.on_commit(send)
+```
+
+- **The event choice is the notification-worthy one.** The brief's
+  producer fired on application *submitted*; this implementation
+  fires on *status changed* — the moment a candidate actually cares
+  about — and the view's `old != new` guard means a no-op PATCH emits
+  nothing. Event shape is self-describing (`type`, plus old/new
+  status) and carries a `uuid4 event_id`: the dedupe key any future
+  consumer will need, minted at the source.
+- **`on_commit` again** (entry 22's discipline, second use): the
+  event is published only if the status update actually commits — no
+  "your application moved to interview" for a transaction that rolled
+  back.
+- **The honest trade-off:** if SQS is unreachable at commit time, the
+  failure is logged and the status change *still succeeds* — the
+  event is lost. That's the dual-write problem; the strict fix is a
+  transactional outbox table (event row written in the same
+  transaction, relayed by a poller). For a notification-grade event
+  in this phase, log-and-continue is a defensible choice — made
+  consciously, it should stay documented as the known gap it is.
+
+### Worker: a boring loop, correctly boring
+
+```python
+# worker/run_worker.py — standalone process, Django bootstrapped
+signal.signal(SIGTERM, stop); signal.signal(SIGINT, stop)   # running = False
+while running:
+    close_old_connections()
+    for message in queue.receive():          # batch 10, 20 s long poll
+        try:
+            handle(message)
+        except Exception:
+            logger.exception("...; it will be retried"); continue
+        queue.delete(message)
+```
+
+- **Delete only after success.** The at-least-once contract in one
+  branch: handled → deleted; failed → left in the queue, returns
+  after the 30 s visibility timeout, retried; third failure → SQS
+  redrive moves it to the DLQ provisioned in entry 23. The chain
+  designed across two commits now closes end to end.
+- **Graceful shutdown with matching numbers.** SIGTERM flips a flag;
+  the loop finishes its current batch and exits. Compose grants
+  `stop_grace_period: 30s` — deliberately longer than the 20 s long
+  poll, so a shutdown signal never has to kill mid-receive. Small
+  numbers, chosen to fit each other.
+- **Idempotency: safe today by handler design.** The handler is a
+  structured log line — processing the same event twice is harmless,
+  so no dedupe table exists yet (and none is needed *for this
+  handler*). Duplicates are still possible (crash between handle and
+  delete → redelivery), and the `event_id` is logged with every
+  handling, so the moment a side-effecting handler lands (a real
+  email), the dedupe design — a processed-events table keyed on
+  `event_id` — slots into ground already prepared. Claiming more
+  idempotency than this would be overstatement; claiming less would
+  miss that the key is already flowing.
+- **Strictness on unknown types**: an unrecognized `type` raises,
+  retries three times, and DLQs. Correct posture — a message that can
+  never succeed should surface in the DLQ as schema drift, not be
+  silently dropped.
+- Two gaps for the hardening phase: an exception in `receive()`
+  itself (SQS unreachable) is not caught in the loop, so the worker
+  exits — and the Compose service declares no `restart:` policy, so
+  it would stay down; and there is no health signal yet (the brief's
+  touched-file healthcheck) for an orchestrator to notice a wedged
+  worker. Both are Phase 5 material, noted now so they're findable.
+
+### Status
+
+Phase 3's queue story is complete: interface + DLQ provisioning
+(entry 23), producer on commit, worker with retry/DLQ semantics and
+graceful shutdown. Remaining: ops endpoints and hardening
+(Phase 3 finish / Phase 5), the my-applications list and close
+action (Phase 2 leftovers), a README sync for Phase 3, entry 8
+cleanups.
+
+### Article angles
+
+- "Delete on success, retry on failure: the at-least-once contract in twelve lines"
+- "The dual-write problem in your own codebase: on_commit publishing vs the outbox pattern"
+- "Idempotency is a property of the handler, not the queue"
+- "Graceful shutdown arithmetic: stop_grace_period must exceed your long poll"
+- "Unknown message types should DLQ, not disappear: strict consumers surface schema drift"
