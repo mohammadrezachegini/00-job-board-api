@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-01 — docs: technical notes entry 24 — event publishing + worker (5b76a6a)
+- 2026-11-01 — docs: journal — status-change events + worker service (4536b22)
+- 2026-11-02 — docs: update changelog [skip changelog] (78ca911)
 - 2026-11-01 — Publish status changes to SQS on commit; add worker service with graceful shutdown and DLQ (9d210da)
 - 2026-11-01 — docs: update changelog [skip changelog] (8d0c03d)
 - 2026-10-31 — docs: technical notes entry 23 — queue interface + SQS DLQ (de640bc)
