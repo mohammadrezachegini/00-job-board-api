@@ -284,3 +284,14 @@ This journal is updated as new work is pushed.
   for Azure Service Bus later means one new implementation, not a
   rewrite. The producer, worker and message formats come next.
   Technical breakdown in `docs/technical-notes.md`, entry 23.
+- 2026-11-01 (commit `9d210da`, "Publish status changes to SQS on
+  commit; add worker service"): the queue from entry 23 gets its
+  producer and consumer. When a company changes an application's
+  status, the API publishes an `application.status_changed` event —
+  after the database commit, and only when the status actually
+  changed. A new worker service polls the queue, handles events
+  (today: a structured log line), deletes only on success, and shuts
+  down gracefully on SIGTERM, finishing its current batch. Failed
+  messages return for retry and land in the DLQ after three attempts,
+  exactly as provisioned. Technical breakdown in
+  `docs/technical-notes.md`, entry 24.
