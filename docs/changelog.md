@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-01 — Publish status changes to SQS on commit; add worker service with graceful shutdown and DLQ (9d210da)
+- 2026-11-01 — docs: update changelog [skip changelog] (8d0c03d)
 - 2026-10-31 — docs: technical notes entry 23 — queue interface + SQS DLQ (de640bc)
 - 2026-11-01 — docs: update changelog [skip changelog] (4328ea2)
 - 2026-10-31 — docs: journal — SQS queue + DLQ, cloud.queue interface (060ba4b)
