@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-04 — Update README for Phase 3 (d3477b9)
+- 2026-11-05 — docs: update changelog [skip changelog] (244c686)
 - 2026-11-05 — docs: update changelog [skip changelog] (0774752)
 - 2026-11-04 — docs: technical notes entry 26 — idempotency via claim-in-transaction (8cc78ea)
 - 2026-11-04 — docs: journal — idempotent worker, ProcessedEvent dedupe (6c4ff93)
