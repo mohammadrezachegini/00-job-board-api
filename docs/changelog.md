@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-04 — Idempotent worker: claim event_id in ProcessedEvent within the send transaction (cbc4b81)
+- 2026-11-05 — docs: update changelog [skip changelog] (fc6a05d)
 - 2026-11-05 — docs: update changelog [skip changelog] (bd011c2)
 - 2026-11-04 — docs: technical notes entry 25 — worker email handler, dedupe debt (290c200)
 - 2026-11-04 — docs: journal — worker sends status-change emails (e8d9daa)
