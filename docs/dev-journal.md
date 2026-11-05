@@ -295,3 +295,14 @@ This journal is updated as new work is pushed.
   messages return for retry and land in the DLQ after three attempts,
   exactly as provisioned. Technical breakdown in
   `docs/technical-notes.md`, entry 24.
+- 2026-11-04 (commit `63fab44`, "Worker sends status-change emails
+  (console backend); skip deleted applications"): the notification
+  pipeline is real. On a status-change event, the worker loads the
+  application, renders a plain-text email from a template, and sends
+  it to the candidate — locally the mail lands in the worker's console
+  log, because the email backend is an environment variable. If the
+  application no longer exists, the worker logs and skips instead of
+  retrying forever. One debt is now live and logged in entry 25: with
+  a side-effecting handler, duplicate delivery can mean a duplicate
+  email until event-id deduplication lands. Technical breakdown in
+  `docs/technical-notes.md`, entry 25.
