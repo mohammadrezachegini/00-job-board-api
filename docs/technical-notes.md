@@ -2276,3 +2276,102 @@ cleanups.
 - "Idempotency is a property of the handler, not the queue"
 - "Graceful shutdown arithmetic: stop_grace_period must exceed your long poll"
 - "Unknown message types should DLQ, not disappear: strict consumers surface schema drift"
+
+---
+
+## Entry 25 — 2026-11-04 — The worker sends email; the dedupe debt comes due (commit `63fab44`)
+
+### From log line to side effect
+
+```python
+# worker/run_worker.py
+def handle_status_changed(body):
+    try:
+        application = Application.objects.select_related(
+            "job__company", "candidate__user").get(id=body["application_id"])
+    except Application.DoesNotExist:
+        logger.warning("Application %s no longer exists; skipping (event %s)", ...)
+        return                      # returns normally → message DELETED
+    send_status_changed_email(application, body["new_status"])
+
+# jobs/emails.py
+def send_status_changed_email(application, new_status):
+    ...
+    subject = _one_line(f"Your application for {application.job.title}: {status_label}")
+    body = render_to_string("emails/status_changed.txt", context)
+    send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [candidate.email],
+              fail_silently=False)
+```
+
+Everything entry 24 predicted now applies. Design decisions inside
+the handler, almost all of them right:
+
+- **Failure taxonomy stays consistent.** A *gone* application is a
+  permanent condition → log, return, delete the message (retrying a
+  deleted row into the DLQ would be pure noise). A *send failure* is
+  transient → `fail_silently=False` raises inside the handler → the
+  loop's existing path retries, then DLQs. A garbage status value
+  raises in `Application.Status(...)` → same retry/DLQ path. Three
+  failure kinds, three deliberate outcomes, no new machinery.
+- **The email speaks from the event, not the database.** The status
+  in the subject and body is the event's `new_status` (rendered as a
+  human label — "Interview", not "interview"), so two rapid changes
+  produce two truthful emails in event order rather than two emails
+  both describing the final state.
+- **The database load is only for addressing and context** —
+  recipient email, candidate name (`first_name or username`), job
+  title, company name — fetched in one `select_related` query.
+- **Subject hygiene**: `_one_line()` collapses whitespace/newlines
+  out of the user-controlled job title before it becomes a header —
+  header-injection defence in depth alongside `send_mail`'s own
+  guard. The text template sets `{% autoescape off %}` correctly for
+  a plain-text (non-HTML) email.
+- **Backend is configuration**: `EMAIL_BACKEND` from env, defaulting
+  to Django's console backend — emails appear in worker logs locally,
+  and SES/SMTP becomes an env change, not a code change (the same
+  portability seam pattern as entries 17/23: endpoint/credentials in
+  env, code untouched). `DEFAULT_FROM_EMAIL` likewise.
+
+### The debt, now with a user-visible consequence
+
+Entry 24 said: the log-only handler made duplicates harmless, and
+dedupe becomes necessary the moment a side-effecting handler lands.
+That moment is this commit, and dedupe is **not** here — no
+processed-events table, no new migration. Today's exposure, stated
+plainly:
+
+- If the worker crashes (or is stopped mid-batch) after `send_mail`
+  succeeds but before `queue.delete` runs, the message is redelivered
+  and the candidate gets the **same email twice**. Same result if
+  handling ever exceeds the 30 s visibility timeout.
+- Mitigations that exist: the sends are fast, batches are small, and
+  every handling logs its `event_id`, so a duplicate is traceable in
+  logs after the fact. Nothing *prevents* one.
+- The fix is the design already sketched in entry 24: a
+  processed-events table keyed on `event_id`, written in the **same
+  transaction** as the handler's effect where possible (for email,
+  the practical form is: record-then-send with the unique constraint
+  deciding who sends — accepting the inverse edge: crash between
+  record and send loses one email instead of duplicating one; pick
+  the failure you prefer, consciously).
+
+This is the top functional gap in the project as of this entry —
+ahead of the cosmetic serializer items in entry 8 — because its
+failure mode reaches a real user's inbox.
+
+### Status
+
+Phase 3 functionally complete: cache (22), queue + DLQ (23),
+producer + worker (24), real notification handler (25). Open, in
+rough priority: event-id dedupe; the two Phase 2 leftovers
+(my-applications list, close action); ops endpoints (health/ready —
+planned programme items, not yet started) and worker restart policy;
+entry 8 cleanups; README Phase 3 sync.
+
+### Article angles
+
+- "Your first side effect changes everything: when at-least-once stops being free"
+- "Permanent vs transient failures: why a deleted row should delete the message too"
+- "Record-then-send vs send-then-record: picking which failure you prefer"
+- "Email from env: Django's backend setting as a portability seam"
+- "Header injection hides in user content: sanitizing subjects built from job titles"
