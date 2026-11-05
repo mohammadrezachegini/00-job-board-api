@@ -2479,3 +2479,55 @@ ProcessedEvent pruning policy someday.
 - "Let the unique constraint arbitrate: dedupe without locks, flags, or race windows"
 - "Your dedupe table needs a retention policy the day you create it"
 - "A commit message that names the trade-off ('within the send transaction') is documentation"
+
+---
+
+## Entry 27 — 2026-11-04 — README catches up: Phase 3, documented with its test evidence (commit `d3477b9`)
+
+The Phase 3 README sync (same pattern as entry 21) is complete and
+accurate across every surface checked against entries 22–26:
+
+- **Status line** now reads "Phase 3 (background worker) complete,"
+  with ops endpoints, structured logs, tests and cloud deployment
+  honestly deferred to later phases.
+- **Architecture diagram** shows the cached search, the
+  `job-board-status` queue redriving to its `-dlq` after 3 failures,
+  and the worker claiming `event_id` and sending the email.
+- **Feature and env sections** cover the cache (60 s TTL, on-commit
+  invalidation, `X-Cache`, Redis-down behaviour), the worker,
+  `REDIS_URL` / `SQS_*` / `EMAIL_*` variables, `ProcessedEvent` in the
+  model list, and the `cloud/queue.py` seam in the project layout.
+- **Design decisions** restate the load-bearing ones precisely:
+  side effects only after commit (both invalidation and publishing),
+  "messages carry IDs, not personal data" (the worker re-reads state
+  from the database), idempotency as a unique `event_id` claimed in
+  the send transaction, one image / two process types.
+- **Most valuable: the manual-checks list is evidence, not vibes.**
+  It records testing cache invalidation *not* firing on a rolled-back
+  save, messages waiting out a stopped worker, a poison message
+  reaching the DLQ, and the two simulations that prove entry 26's
+  design — crash after send, before delete → redelivered copy skipped,
+  no second email; mail-server failure → claim rolled back, retry
+  sent the email. Exactly the cases the dedupe design turns on.
+- **"What Broke" grows honestly**: Phase 3 adds the invalidation
+  function that was defined but never wired to `on_commit` (found by
+  checking the cache version before/after a save — a debugging-method
+  lesson worth the space it takes) and the missing `LOGGING` config
+  (INFO-level API logs don't exist yet; flagged as Phase 4 work,
+  which matches the ops backlog). Phase 2's list also gains his own
+  catches from that phase (filter `lookup_expr` 500, `url_path`
+  404, empty status accepted with 200 — the last being the origin of
+  the strict status serializer in entry 13).
+
+One precision nit, recorded here rather than litigated: the README's
+"a redelivered message **never** sends a second email" is a hair
+stronger than the code's guarantee — entry 26 documents the residual
+pre-commit crash window. The checks list itself claims only what was
+tested; if the README is ever quoted in an interview, "recognized
+and skipped" is the defensible phrasing.
+
+**Status: Project 00's Phase 3 is closed — feature-complete,
+idempotent, and documented end to end.** Remaining backlog: Phase 4
+ops (health/ready/metrics, structured logs, LOGGING config), worker
+restart policy, Phase 2 leftovers (my-applications list, close
+action), entry 8 serializer hygiene, ProcessedEvent pruning policy.
