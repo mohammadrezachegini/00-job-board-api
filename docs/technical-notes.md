@@ -2375,3 +2375,107 @@ entry 8 cleanups; README Phase 3 sync.
 - "Record-then-send vs send-then-record: picking which failure you prefer"
 - "Email from env: Django's backend setting as a portability seam"
 - "Header injection hides in user content: sanitizing subjects built from job titles"
+
+---
+
+## Entry 26 — 2026-11-04 — Idempotent worker: claim-first inside the send transaction (commit `cbc4b81`)
+
+### The mechanism
+
+```python
+class ProcessedEvent(models.Model):
+    event_id = models.CharField(max_length=64, unique=True)   # migration 0006
+    event_type = models.CharField(max_length=100)
+    processed_at = models.DateTimeField(auto_now_add=True)
+
+def claim_event(event_id, event_type):
+    try:
+        with transaction.atomic():                 # savepoint when nested
+            ProcessedEvent.objects.create(event_id=event_id, event_type=event_type)
+    except IntegrityError:
+        return False
+    return True
+
+def handle_status_changed(body):
+    with transaction.atomic():                     # outer transaction
+        if not claim_event(body["event_id"], STATUS_CHANGED):
+            return                                 # duplicate → skip, message deleted
+        application = ...get(...) or return        # gone app: still claims, still commits
+        send_status_changed_email(application, body["new_status"])
+    # commit happens here — then the loop deletes the queue message
+```
+
+### What it guarantees, case by case
+
+- **Redelivery after success** (the common case — crash or shutdown
+  between commit and queue delete, visibility expiry): the claim row
+  is committed, the second `create` hits the unique constraint, the
+  handler skips, the message is deleted. No second email. ✓
+- **Send failure**: `send_mail` raises → the outer transaction rolls
+  back → *the claim vanishes with it* → the retry re-claims and
+  re-sends cleanly. This is why the claim lives inside the send
+  transaction rather than being committed first: a claim-first-commit
+  design would convert every transient SMTP failure into a silently
+  swallowed event. ✓
+- **Concurrent duplicates** (two workers, or an overlap while a slow
+  send outlives the visibility timeout): the unique index serializes
+  the claim — one transaction wins, the other blocks, then raises
+  IntegrityError and skips; if the winner rolls back, the blocked
+  create proceeds. The database arbitrates, not application luck. ✓
+- **The savepoint detail matters**: `claim_event` wraps its `create`
+  in its own `atomic()` precisely so the IntegrityError can be caught
+  *inside* the outer transaction without poisoning it — Django
+  forbids queries after an error in a transaction unless a savepoint
+  absorbed it. Same pattern as the application-create savepoint in
+  entry 11, recognised and reused. ✓
+- **Gone application**: claimed and committed as processed, message
+  deleted — yesterday's permanent-vs-transient taxonomy preserved
+  under the new machinery.
+
+### The edge that remains, honestly stated
+
+Email cannot join a database transaction. If the process dies
+*after* `send_mail` succeeds but *before* the outer commit lands,
+the claim rolls back, the message returns, and one duplicate email
+goes out. The window shrank from "send → queue delete" (network
+latency, whole event loop) to "send → local commit" (milliseconds),
+and cannot shrink further without changing the failure you prefer:
+
+- **This design** (claim + send, one transaction) prefers: duplicates
+  are nearly impossible; lost emails require the send itself to fail,
+  which the retry path covers.
+- **The alternative** (commit claim first, then send) prefers: never
+  duplicate; accepts that a crash between commit and send loses the
+  email silently, forever, with the processed-table insisting it was
+  handled.
+
+Effectively-once here is a choice of which rare failure you'd rather
+explain, and the commit title documents that the choice was seen
+("within the send transaction"), not stumbled into.
+
+Two maintenance notes for later, neither a defect today: the
+ProcessedEvent table grows one row per event forever — pruning rows
+beyond the queue's maximum retention (14 days for SQS) is a safe
+future cleanup; and holding the transaction open across an external
+SMTP call means a future slow real-mail send also holds a DB
+connection and the claim row's lock — fine at this scale, worth
+remembering at larger ones.
+
+### Status
+
+Phase 3 is now complete *with* idempotency — the arc runs 22 (cache),
+23 (queue + DLQ), 24 (producer + worker), 25 (email handler), 26
+(dedupe). The dedupe gap flagged as the project's top functional debt
+in entry 25 was closed the same night it opened. Remaining queue:
+ops endpoints (health/ready/metrics — Phase 4 programme items),
+worker restart policy, the Phase 2 leftovers (my-applications list,
+close action), entry 8 cleanups, README Phase 3 sync, and now a
+ProcessedEvent pruning policy someday.
+
+### Article angles
+
+- "Effectively-once is a preference, not a property: claim-in-transaction vs commit-first"
+- "Savepoints let you catch IntegrityError safely inside a transaction — Django's quiet superpower"
+- "Let the unique constraint arbitrate: dedupe without locks, flags, or race windows"
+- "Your dedupe table needs a retention policy the day you create it"
+- "A commit message that names the trade-off ('within the send transaction') is documentation"
