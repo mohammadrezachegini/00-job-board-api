@@ -315,3 +315,11 @@ This journal is updated as new work is pushed.
   failed send rolls the claim back so the retry can work. Duplicate
   emails now survive only in a crash window a few milliseconds wide.
   Technical breakdown in `docs/technical-notes.md`, entry 26.
+- 2026-11-04 (commit `d3477b9`, "Update README for Phase 3"): the
+  README catches up with Phase 3 — status line, architecture diagram
+  (cache, queue, DLQ, worker), feature list, env table and project
+  layout all describe the system as it now is. Its manual-checks list
+  records the crash-after-send and mail-failure simulations used to
+  prove the idempotency design, and the "What Broke" section gains
+  two honest Phase 3 entries. Brief note in `docs/technical-notes.md`,
+  entry 27.
