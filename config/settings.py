@@ -60,6 +60,8 @@ JOB_LIST_CACHE_SECONDS = 60
 AWS_SQS_ENDPOINT_URL = env("AWS_SQS_ENDPOINT_URL", "") or None
 SQS_QUEUE_NAME = env("SQS_QUEUE_NAME")
 AWS_REGION = env("AWS_REGION", "us-east-1")
+EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Job Board <no-reply@jobboard.test>")
 # Application definition
 
 INSTALLED_APPS = [

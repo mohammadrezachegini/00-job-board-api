@@ -15,3 +15,5 @@ login_all() {
   DANA=$(token dana); SAM=$(token sam); RIYA=$(token riya)
   echo "Tokens loaded (valid 15 min)."
 }
+# SQS queue depth: messages waiting / in flight. Usage: qdepth job-board-status
+qdepth() { docker compose exec -T localstack sh -c "awslocal sqs get-queue-attributes --queue-url \"\$(awslocal sqs get-queue-url --queue-name $1 --query QueueUrl --output text)\" --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible --query Attributes" 2>/dev/null | grep -v WARNING | tr -d '\n '; echo; }

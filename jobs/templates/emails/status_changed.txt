@@ -1,0 +1,9 @@
+{% autoescape off %}Hi {{ name }},
+
+The status of your application for {{ job_title }} at {{ company }} has changed.
+
+New status: {{ status }}
+
+Good luck,
+The Job Board team
+{% endautoescape %}
