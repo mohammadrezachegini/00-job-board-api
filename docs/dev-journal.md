@@ -306,3 +306,12 @@ This journal is updated as new work is pushed.
   a side-effecting handler, duplicate delivery can mean a duplicate
   email until event-id deduplication lands. Technical breakdown in
   `docs/technical-notes.md`, entry 25.
+- 2026-11-04 (commit `cbc4b81`, "Idempotent worker: claim event_id in
+  ProcessedEvent within the send transaction"): the dedupe debt from
+  entry 25 is paid the same night. A new ProcessedEvent table records
+  each handled event's id. The worker now claims the event — inserting
+  its id — inside the same transaction that sends the email, so a
+  redelivery after a successful send is recognised and skipped, and a
+  failed send rolls the claim back so the retry can work. Duplicate
+  emails now survive only in a crash window a few milliseconds wide.
+  Technical breakdown in `docs/technical-notes.md`, entry 26.
