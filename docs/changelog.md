@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-04 — docs: technical notes entry 25 — worker email handler, dedupe debt (290c200)
+- 2026-11-04 — docs: journal — worker sends status-change emails (e8d9daa)
+- 2026-11-05 — docs: update changelog [skip changelog] (99ef314)
 - 2026-11-04 — Worker sends status-change emails (console backend); skip deleted applications (63fab44)
 - 2026-11-02 — docs: update changelog [skip changelog] (b76d5e8)
 - 2026-11-02 — docs: update changelog [skip changelog] (2eb9712)
