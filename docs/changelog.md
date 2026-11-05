@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-04 — docs: technical notes entry 26 — idempotency via claim-in-transaction (8cc78ea)
+- 2026-11-04 — docs: journal — idempotent worker, ProcessedEvent dedupe (6c4ff93)
+- 2026-11-05 — docs: update changelog [skip changelog] (13dac8a)
 - 2026-11-04 — Idempotent worker: claim event_id in ProcessedEvent within the send transaction (cbc4b81)
 - 2026-11-05 — docs: update changelog [skip changelog] (fc6a05d)
 - 2026-11-05 — docs: update changelog [skip changelog] (bd011c2)
