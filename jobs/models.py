@@ -123,3 +123,12 @@ class Application(models.Model):
 
     def __str__(self):
         return f"{self.candidate} -> {self.job}"
+
+
+class ProcessedEvent(models.Model):
+    event_id = models.CharField(max_length=64, unique=True)
+    event_type = models.CharField(max_length=100)
+    processed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.event_type} {self.event_id}"

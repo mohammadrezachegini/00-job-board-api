@@ -7,12 +7,12 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
-from django.db import close_old_connections  # noqa: E402
+from django.db import IntegrityError, close_old_connections, transaction  # noqa: E402
 
 from cloud.queue import get_queue  # noqa: E402
 from jobs.events import STATUS_CHANGED  # noqa: E402
 from jobs.emails import send_status_changed_email  # noqa: E402
-from jobs.models import Application  # noqa: E402
+from jobs.models import Application, ProcessedEvent  # noqa: E402
 
 logger = logging.getLogger("worker")
 
@@ -59,19 +59,44 @@ def main():
     logger.info("Worker stopped")
 
 
-def handle_status_changed(body):
+def claim_event(event_id, event_type):
     try:
-        application = Application.objects.select_related("job__company", "candidate__user").get(
-            id=body["application_id"]
-        )
-    except Application.DoesNotExist:
-        logger.warning("Application %s no longer exists; skipping (event %s)", body["application_id"], body["event_id"])
-        return
+        with transaction.atomic():
+            ProcessedEvent.objects.create(event_id=event_id, event_type=event_type)
+    except IntegrityError:
+        return False
+    return True
 
-    send_status_changed_email(application, body["new_status"])
+
+def handle_status_changed(body):
+    with transaction.atomic():
+        if not claim_event(body["event_id"], STATUS_CHANGED):
+            logger.info(
+                "Event %s already processed; skipping duplicate", body["event_id"]
+            )
+            return
+
+        try:
+            application = Application.objects.select_related(
+                "job__company", "candidate__user"
+            ).get(id=body["application_id"])
+        except Application.DoesNotExist:
+            logger.warning(
+                "Application %s no longer exists; skipping (event %s)",
+                body["application_id"],
+                body["event_id"],
+            )
+            return
+
+        send_status_changed_email(application, body["new_status"])
+
     logger.info(
         "Emailed user %s about application %s: %s -> %s (event %s)",
-        application.candidate.user_id, application.id, body["old_status"], body["new_status"], body["event_id"],
+        application.candidate.user_id,
+        application.id,
+        body["old_status"],
+        body["new_status"],
+        body["event_id"],
     )
 
 
