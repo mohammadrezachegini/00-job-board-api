@@ -357,3 +357,14 @@ This journal is updated as new work is pushed.
   `docs/technical-notes-archive-1.md` (with a pointer left in the main
   file). Entries 29–30, which were held locally for this split, are
   now published in the main notes file.
+- 2026-11-06 (commit `8fe0d61`, "All config from env"): settings are
+  now fully environment-driven and strict. The env reader treats empty
+  values as missing and fails fast on absent required variables; new
+  typed helpers parse booleans and lists properly, so DEBUG defaults
+  to off and allowed hosts defaults to localhost instead of the old
+  scaffold wildcard. Two long-standing cleanups landed in the same
+  pass: the two region variables were unified into one AWS_REGION,
+  the leftover scaffold block containing an old insecure key string
+  was deleted, and the LocalStack auth token moved out of the
+  committed Compose file into its own ignored env file. Technical
+  breakdown in `docs/technical-notes.md`, entry 31.
