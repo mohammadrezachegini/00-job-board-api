@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-05 — docs: journal — /metrics via django-prometheus (4b283a3)
+- 2026-11-06 — docs: update changelog [skip changelog] (b74f35c)
 - 2026-11-05 — Add /metrics via django-prometheus (request, latency and DB metrics) (b0cf235)
 - 2026-11-06 — docs: update changelog [skip changelog] (2ae5217)
 - 2026-11-05 — docs: technical notes entry 28 — health vs readiness, resilient worker (559e316)
