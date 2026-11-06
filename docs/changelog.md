@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-05 — docs: journal — healthz/readyz, resilient worker, restart policy (0244f94)
+- 2026-11-06 — docs: update changelog [skip changelog] (64d6625)
 - 2026-11-05 — Add /healthz and /readyz with bounded dependency checks; resilient worker; restart policy (7e465b8)
 - 2026-11-05 — docs: update changelog [skip changelog] (011f4c6)
 - 2026-11-04 — docs: technical notes entry 27 — README Phase 3, Phase 3 closed (cd2ba51)
