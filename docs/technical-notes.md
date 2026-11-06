@@ -969,3 +969,97 @@ progress is being judged from the repo, per usual.
 - "One source, two names: aliasing config instead of duplicating it"
 - ".gitignore as a security control: glob the secrets, whitelist the examples"
 - "Safe defaults are decisions: DEBUG off and loopback hosts as the factory settings"
+
+---
+
+## Entry 32 — 2026-11-06 — Multi-stage Dockerfile, non-root, gunicorn (commit `4cb2e82`)
+
+### Two stages, separated by what the runtime deserves
+
+```dockerfile
+FROM python:3.12-slim AS builder
+COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /bin/uv
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
+COPY pyproject.toml uv.lock .python-version ./
+RUN uv sync --locked --no-dev --no-install-project
+
+FROM python:3.12-slim AS runtime
+ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+RUN useradd --uid 1000 --no-create-home --shell /usr/sbin/nologin app
+COPY --from=builder /opt/venv /opt/venv
+COPY . .
+USER app
+EXPOSE 8006
+CMD ["gunicorn", "config.wsgi:application", "--config", "gunicorn.conf.py"]
+```
+
+- **The builder never ships.** uv itself arrives pinned from its
+  official image (no pip bootstrap); dependencies resolve `--locked`
+  (the lockfile is law) and `--no-dev` into a venv at `/opt/venv`,
+  outside the source tree so it copies as one clean layer. Only the
+  dependency files are copied before `uv sync`, so the expensive
+  layer is cached until `pyproject.toml`/`uv.lock` actually change —
+  code edits rebuild in seconds. `UV_COMPILE_BYTECODE=1` precompiles
+  `.pyc` in the builder; the runtime pairs it with
+  `PYTHONDONTWRITEBYTECODE=1` (it couldn't write anyway, and shouldn't).
+- **The runtime is the minimum**: fresh slim Python + venv + code,
+  running as `app` (uid 1000, no home, nologin shell — a service
+  account, not a person). `COPY . .` is safe because `.dockerignore`
+  was audited in the same pass: `.git`, `.venv`, and — the critical
+  one — `.env` / `.env.*` are excluded, so **no secrets are baked
+  into the image** (only the harmless `.env.example` template rides
+  along). Root-owned code files are read-only to the app user, which
+  is the correct posture for a process that writes only to S3 and
+  Postgres.
+- **Dev/prod split without forking the stack**: the image's CMD is
+  gunicorn, but Compose overrides `command:` back to
+  `runserver 0.0.0.0:8006` with the bind mount for live reload — one
+  image definition, two honest modes. The worker service continues
+  to prove the one-image/two-processes pattern (entry 24).
+
+### Gunicorn, configured like it matters (`gunicorn.conf.py`)
+
+- `bind` from `PORT` (default 8006): the platform can relocate the
+  service without a rebuild — the same env-first discipline as
+  entry 31, extended to the server itself.
+- `gthread` with **workers=1, threads=4**, both env-tunable,
+  timeout/graceful-timeout 30 s (matching the Compose stop-grace
+  arithmetic from entry 24). The conservative single-worker default
+  has a hidden virtue: django-prometheus keeps its registry
+  in-process (entry 29), so one worker keeps `/metrics` coherent;
+  scaling workers later is a metrics-multiprocess conversation, not
+  a silent breakage.
+- **The server's logs join the app's schema**: `logconfig_dict`
+  forces gunicorn's own access/error loggers through the same
+  python-json-logger formatter as the Django config (entry 30), all
+  to stdout. Access lines, app lines, worker lines — one JSON shape
+  for the pipeline to ingest. Observability consistency extends to
+  the process boundary.
+
+### Known next-step (not a defect of this commit)
+
+Under gunicorn, Django's static files (the admin's CSS/JS) are not
+served by anything — `runserver` masked that in dev. A production
+pass needs whitenoise or a `collectstatic` + file-server story
+before the admin is usable behind gunicorn. Application JSON
+traffic, the actual product surface, is unaffected.
+
+### Status
+
+**Phase 4 is complete**: probes (28), metrics (29), structured logs
+(30), env-only config (31), production image (32). Project 00 now
+stands production-shaped locally: it can be probed, scraped, traced,
+configured and shipped. Remaining backlog is functional, not
+operational: my-applications list, close action, ProcessedEvent
+pruning, cache-metrics wiring, entry 8 serializer hygiene,
+match-score null docstring, static-files serving under gunicorn —
+and Phase 5 tests above all, per the programme.
+
+### Article angles
+
+- "The builder stage never ships: multi-stage Dockerfiles with uv"
+- "Layer caching is a copy-order decision: manifests before code"
+- "Your .dockerignore is a secrets control — audit it like one"
+- "One worker by default: the quiet interaction between gunicorn scaling and in-process metrics"
+- "Make the server's logs speak your app's schema: gunicorn logconfig_dict meets Django LOGGING"
