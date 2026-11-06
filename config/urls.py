@@ -23,5 +23,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/", include("jobs.urls")),
     path("healthz", healthz),
-    path("readyz", readyz)
+    path("readyz", readyz),
+    path("", include("django_prometheus.urls")),
 ]
