@@ -368,3 +368,13 @@ This journal is updated as new work is pushed.
   was deleted, and the LocalStack auth token moved out of the
   committed Compose file into its own ignored env file. Technical
   breakdown in `docs/technical-notes.md`, entry 31.
+- 2026-11-06 (commit `4cb2e82`, "Multi-stage Dockerfile, non-root
+  user, gunicorn"): the image grows up. A builder stage installs
+  dependencies into a virtualenv with uv; the runtime stage copies in
+  only Python, the venv and the code, runs as a non-root user, and
+  serves the app with gunicorn instead of the development server —
+  its own logs formatted with the same JSON config as the app's.
+  Local development is untouched: Compose overrides the command back
+  to runserver with the code bind-mounted. With this, Phase 4's
+  build-and-operate list is complete. Technical breakdown in
+  `docs/technical-notes.md`, entry 32.
