@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-05 — Structured JSON logs to stdout (python-json-logger), LOG_LEVEL from env, event_id/application_id fields (73a91c5)
+- 2026-11-06 — docs: update changelog [skip changelog] (94c279f)
 - 2026-11-05 — docs: journal — /metrics via django-prometheus (4b283a3)
 - 2026-11-06 — docs: update changelog [skip changelog] (b74f35c)
 - 2026-11-05 — Add /metrics via django-prometheus (request, latency and DB metrics) (b0cf235)
