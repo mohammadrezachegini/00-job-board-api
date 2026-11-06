@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — All config from env: required/empty fail fast, typed helpers, safe defaults, one AWS_REGION; LocalStack token isolated (8fe0d61)
+- 2026-11-06 — docs: update changelog [skip changelog] (5ab1223)
 - 2026-11-05 — docs: journal — technical notes archive split (40439ac)
 - 2026-11-06 — docs: update changelog [skip changelog] (c3b6c38)
 - 2026-11-05 — docs: technical notes — split archive 1, publish entries 29-30 (b6c15aa)
