@@ -2531,3 +2531,101 @@ idempotent, and documented end to end.** Remaining backlog: Phase 4
 ops (health/ready/metrics, structured logs, LOGGING config), worker
 restart policy, Phase 2 leftovers (my-applications list, close
 action), entry 8 serializer hygiene, ProcessedEvent pruning policy.
+
+---
+
+## Entry 28 — 2026-11-05 — Health vs readiness, a resilient worker loop, restart policy (commit `7e465b8`)
+
+### Two probes, two different questions (`cloud/health.py`)
+
+```python
+def healthz(request):                      # liveness
+    return JsonResponse({"status": "ok"})  # checks NOTHING
+
+CHECKS = [
+    ("database", _check_database, True),   # SELECT 1 — critical
+    ("cache",    _check_cache,    False),  # SET+GET round-trip — advisory
+    ("queue",    _check_queue,    False),  # get_queue().ping() — advisory
+]
+
+def readyz(request):                       # 200 when ready, 503 when not
+    ... per-check {status, critical, ms}, failures logged with exc_info ...
+```
+
+- **Liveness checks nothing on purpose.** `/healthz` proving only
+  "the process responds" is the correct semantics: if liveness
+  consulted dependencies, a sick database would make the orchestrator
+  restart healthy app processes in a loop. Readiness is where
+  dependency truth belongs, and it's expressed precisely: each check
+  reports status, criticality and measured milliseconds, and the
+  response is 503 only when a **critical** check fails.
+- **The criticality table encodes the architecture's own degradation
+  philosophy.** Database = critical (nothing works without it).
+  Cache = advisory — entry 22 already designed the API to serve from
+  the database when Redis dies, so readiness honestly mirrors that.
+  Queue = advisory — publishing failures are log-and-continue by
+  entry 24's choice, so a dead queue degrades notifications, not the
+  API. A readiness endpoint that contradicts the app's actual failure
+  behaviour would be theatre; this one agrees with it.
+- **The cache check does a real round-trip** — `set` then `get` with
+  read-back comparison — catching serialization and config failures a
+  bare ping would bless. Errors are exposed as exception *type names*
+  only (no internals in the body), failures log with `exc_info`, and
+  both views are `@never_cache` + GET-only: a health answer must be
+  live, never a cached artefact (a trap this very API, which caches
+  job lists, is well placed to appreciate). The views are plain
+  Django, outside DRF's JWT defaults — probes carry no tokens, by
+  design. (`SQSQueue.ping()` is a new one-call addition behind the
+  entry 23 interface — the abstraction absorbed the probe without
+  touching callers.)
+- One honest bound on "bounded": check latency is *measured and
+  reported*, but there is no explicit per-check timeout in the view
+  itself — bounding rides on the underlying clients' defaults, and
+  the checks run serially. A wedged dependency could hold a probe
+  open longer than an orchestrator's patience; a future hardening
+  pass could wrap each check with its own deadline.
+
+### The worker loop grows scar tissue — correctly
+
+Entry 24 logged two gaps; this commit closes both, and adds a third
+guard nobody had listed:
+
+```python
+try:
+    messages = queue.receive()
+except (BotoCoreError, ClientError):
+    logger.exception("Could not receive messages; retrying in 5 s")
+    time.sleep(5); continue                  # outage ≠ death
+
+... handle ...
+try:
+    queue.delete(message)
+except (BotoCoreError, ClientError):
+    logger.exception("...; it will be redelivered")   # and that's now SAFE
+```
+
+The delete-failure path is where the entries compose: before entry
+26, a lost delete meant a potential duplicate email, so swallowing
+the error would have been risky; with idempotent handling, "let it
+redeliver" is the calm, correct response. Resilience here isn't one
+commit's virtue — it's Phase 3's design decisions paying Phase 4's
+bills. Compose adds `restart: unless-stopped` to **both** api and
+worker: crash-recovery and daemon-restart survival, while a manual
+stop stays stopped — the right default for a dev/ops portfolio stack.
+
+### Status
+
+Phase 4 step 1 (probes) landed ahead of its scheduled night, plus
+the worker-hardening backlog from entry 24 fully cleared. Remaining
+in Phase 4: /metrics, structured JSON logging + LOGGING config,
+multi-stage Dockerfile (tonight's scheduled step). Carry-overs:
+my-applications list, close action, ProcessedEvent pruning,
+entry 8 serializer hygiene, match-score null docstring.
+
+### Article angles
+
+- "Health is not readiness: the two questions every probe must keep separate"
+- "Your readiness criticality table is your degradation philosophy, written down"
+- "A cache check that only pings is lying: round-trip or it didn't happen"
+- "Resilient consumers are built in layers: retry the receive, tolerate the delete, dedupe the handling"
+- "unless-stopped vs always: restart policies are a small decision with loud consequences"
