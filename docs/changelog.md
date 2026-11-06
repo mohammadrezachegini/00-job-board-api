@@ -2,6 +2,7 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — docs: update changelog [skip changelog] (e4da3a3)
 - 2026-11-06 — docs: technical notes entry 32 — multi-stage Dockerfile, gunicorn; Phase 4 complete (118b884)
 - 2026-11-06 — docs: journal — multi-stage Dockerfile, gunicorn (1be6ab7)
 - 2026-11-06 — docs: update changelog [skip changelog] (293bc73)
