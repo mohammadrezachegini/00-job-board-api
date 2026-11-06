@@ -9,6 +9,7 @@ dependencies = [
     "django-storages[s3]>=1.14.6",
     "djangorestframework>=3.18.3",
     "djangorestframework-simplejwt>=5.5.1",
+    "gunicorn>=26.2.0",
     "psycopg[binary]>=3.3.6",
     "python-json-logger>=3.1",
     "redis>=8.1.0",

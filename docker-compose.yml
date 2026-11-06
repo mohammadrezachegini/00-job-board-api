@@ -53,6 +53,7 @@ services:
 
   api:
     build: .
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8006"]
     env_file: .env
     ports:
       - "8006:8006"
