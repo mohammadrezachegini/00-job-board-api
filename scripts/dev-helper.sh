@@ -23,3 +23,6 @@ waitapi() { for i in $(seq 30); do curl -s -o /dev/null http://localhost:8006/he
 
 # Grep the Prometheus metrics. Usage: m 'view="job-list"'
 m() { curl -s http://localhost:8006/metrics | grep "$1"; }
+
+# Readiness check: status, time, curl exit code, JSON. Usage: r
+r() { rm -f /tmp/ready.json; timeout 30 curl -s -o /tmp/ready.json -w "HTTP %{http_code} in %{time_total}s\n" http://localhost:8006/readyz; echo "curl exit=$?"; [ -s /tmp/ready.json ] && python3 -m json.tool /tmp/ready.json; }

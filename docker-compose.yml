@@ -14,11 +14,11 @@ services:
     image: localstack/localstack:2026.10.4
     ports:
       - "127.0.0.1:4566:4566"
+    env_file: .env.localstack
     environment:
       - SERVICES=s3,sqs
       - S3_SKIP_SIGNATURE_VALIDATION=0
-      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:?set LOCALSTACK_AUTH_TOKEN in .env}
-      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:?set AWS_STORAGE_BUCKET_NAME in .env}
       - SQS_QUEUE_NAME=${SQS_QUEUE_NAME:?set SQS_QUEUE_NAME in .env}
     volumes:
       - ./localstack/init/ready.d:/etc/localstack/init/ready.d:ro
@@ -32,8 +32,6 @@ services:
     build: .
     command: ["python", "-m", "worker.run_worker"]
     env_file: .env
-    environment:
-      - POSTGRES_HOST=db
     volumes:
       - .:/app
     depends_on:
@@ -56,8 +54,6 @@ services:
   api:
     build: .
     env_file: .env
-    environment:
-      - POSTGRES_HOST=db
     ports:
       - "8006:8006"
     volumes:
