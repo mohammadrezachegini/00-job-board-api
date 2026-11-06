@@ -1063,3 +1063,57 @@ and Phase 5 tests above all, per the programme.
 - "Your .dockerignore is a secrets control — audit it like one"
 - "One worker by default: the quiet interaction between gunicorn scaling and in-process metrics"
 - "Make the server's logs speak your app's schema: gunicorn logconfig_dict meets Django LOGGING"
+
+---
+
+## Entry 33 — 2026-11-06 — README catches up: Phase 4, with measured evidence (commit `00e0f7e`)
+
+The Phase 4 README sync follows the established pattern (entries 21,
+27) and is accurate against entries 28–32 on every surface checked:
+
+- **Status line**: "Phase 4 (operations-ready) complete," with tests,
+  the Azure path and deployment honestly deferred.
+- **Operations story told precisely**: liveness checks nothing;
+  readiness gates only on PostgreSQL; workers stay at 1 *because
+  metrics are per-process* — the README states outright (in both the
+  env table and design decisions) the rationale entry 32 inferred
+  from the defaults. One image, two modes (gunicorn default,
+  runserver via Compose override); least-privilege notes match the
+  per-service env isolation from entry 31.
+- **A production runbook exists now**: `docker run` with `--env-file`,
+  debug forced off, loopback-bound port, and a `/readyz` curl as the
+  acceptance test — plus the small, real gotcha that `docker run
+  --env-file` keeps quotes literally, so values are written bare.
+- **The manual-checks list is, again, evidence**: PostgreSQL stopped
+  → healthz 200 / readyz 503; dependencies **frozen with
+  `docker compose pause`** (a nastier test than stopping — the
+  process exists but never answers) → readyz still 200 in ~1 s with
+  the failing dependency named; metrics counters verified before/
+  after a known request count; production image verified non-root,
+  code unwritable, serving all surfaces.
+- **Measured numbers recorded**: frozen-dependency readiness improved
+  from >90 s to **1.02–1.06 s** once time limits were applied (this
+  retroactively fulfils the "bounded" promise in entry 28's commit
+  title); image 394 MB → **343 MB** with the multi-stage build;
+  graceful production stop **0.50 s** with gunicorn as PID 1.
+- **"What Broke — Phase 4" is the most instructive section**: a
+  `return` indented inside the loop made readyz check *only* the
+  database — invisible until the freeze test showed Redis/SQS state
+  changing nothing (the test design caught what code review didn't);
+  the worker's queue-error crashes (entry 28's fix) are confessed
+  with the operational footnote that a restart policy only bites
+  after a fresh `docker compose up`; and Phase 3's missing-LOGGING
+  confession is now annotated "Fixed in Phase 4," closing that
+  thread in the document where it opened.
+
+**Status: Project 00, Phases 1–4 complete — features, background
+work, observability, operations — and the documentation set
+(README, journal, these notes) is fully in sync with the code at
+this commit.** Next per the programme: Phase 5, automated tests.
+Functional backlog for whenever it is picked: my-applications list,
+close action, static files behind gunicorn, ProcessedEvent pruning,
+cache metrics, entry 8 serializer hygiene, match-score docstring.
+
+### Article angle
+
+- "Freeze your dependencies, don't just stop them: pause-based readiness testing finds the bugs stop-tests miss"
