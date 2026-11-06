@@ -126,6 +126,10 @@ CACHES = {
         "LOCATION": env("REDIS_URL"),
         "KEY_PREFIX": "jobboard",
         "TIMEOUT": 300,
+        "OPTIONS": {
+            "socket_connect_timeout": 1,
+            "socket_timeout": 1,
+        },
     }
 }
 

@@ -7,6 +7,10 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
+import time  # noqa: E402
+
+from botocore.exceptions import BotoCoreError, ClientError  # noqa: E402
+
 from django.db import IntegrityError, close_old_connections, transaction  # noqa: E402
 
 from cloud.queue import get_queue  # noqa: E402
@@ -41,20 +45,27 @@ def main():
     signal.signal(signal.SIGINT, stop)
 
     queue = get_queue()
-    logger.info("Worker started")
+    logger.info("Worker started, queue %s", queue.url)
 
     while running:
         close_old_connections()
-        for message in queue.receive():
+        try:
+            messages = queue.receive()
+        except (BotoCoreError, ClientError):
+            logger.exception("Could not receive messages; retrying in 5 s")
+            time.sleep(5)
+            continue
+
+        for message in messages:
             try:
                 handle(message)
             except Exception:
-                logger.exception(
-                    "Failed to handle message %s; it will be retried", message.id
-                )
-
+                logger.exception("Failed to handle message %s; it will be retried", message.id)
                 continue
-            queue.delete(message)
+            try:
+                queue.delete(message)
+            except (BotoCoreError, ClientError):
+                logger.exception("Could not delete message %s; it will be redelivered", message.id)
 
     logger.info("Worker stopped")
 
