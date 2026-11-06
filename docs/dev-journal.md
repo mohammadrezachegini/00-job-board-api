@@ -352,3 +352,8 @@ This journal is updated as new work is pushed.
   capped at warnings. This closes the gap the Phase 3 README itself
   confessed (no LOGGING config). Technical breakdown in
   `docs/technical-notes.md`, entry 30.
+- 2026-11-05 (docs maintenance): `docs/technical-notes.md` outgrew the
+  GitHub write tool's size limit, so entries 1–20 moved to
+  `docs/technical-notes-archive-1.md` (with a pointer left in the main
+  file). Entries 29–30, which were held locally for this split, are
+  now published in the main notes file.
