@@ -342,3 +342,13 @@ This journal is updated as new work is pushed.
   completes the classic probe-and-metrics surface an orchestrator
   (and Project 02's Prometheus/Grafana stack) expects. Technical
   breakdown in `docs/technical-notes.md`, entry 29.
+- 2026-11-05 (commit `73a91c5`, "Structured JSON logs to stdout"):
+  logging grows up. Both the API and the worker now emit one JSON
+  object per line to stdout — level, logger, timestamp, message —
+  with the event id, application id and queue message id attached as
+  real fields on the log lines that have them, so logs can be
+  filtered and traced instead of grepped by hope. Verbosity is set by
+  a LOG_LEVEL environment variable, and noisy AWS library loggers are
+  capped at warnings. This closes the gap the Phase 3 README itself
+  confessed (no LOGGING config). Technical breakdown in
+  `docs/technical-notes.md`, entry 30.
