@@ -867,3 +867,105 @@ delivery note has the size math).
 - "Structured logging is a schema decision: rename your fields before a dashboard depends on them"
 - "Cap your dependencies' loggers or drown: botocore at INFO in a polling loop"
 - "One settings module, two processes: shared observability config in a Django monorepo"
+
+---
+
+## Entry 31 — 2026-11-06 — All config from env: fail-fast, typed, unified (commit `8fe0d61`)
+
+This commit closes more long-standing flags per line than any since
+Phase 2 — entry 17's name drift, entry 23's dual regions, the
+scaffold leftovers from the project's third night — all settled in
+one settings pass.
+
+### The reader grows teeth and types
+
+```python
+def env(name, default=None):
+    """No default = required; empty counts as missing."""
+    value = os.environ.get(name)
+    if value is None or value == "":
+        if default is None:
+            raise ImproperlyConfigured(f"Missing required environment variable: {name}")
+        return default
+    return value
+
+def env_bool(name, default=False):
+    return env(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
+
+def env_list(name, default=""):
+    return [item.strip() for item in env(name, default).split(",") if item.strip()]
+```
+
+- **Empty counts as missing.** The old `env()` blessed `""` as a
+  value, which is exactly what a half-filled `.env` line or a
+  Compose `${VAR}` passthrough produces — a misconfiguration that
+  used to surface deep inside boto3 now fails at settings import
+  with the variable's name. (The endpoint settings preserve the old
+  `or None` idiom *deliberately*: for endpoints, empty is a legal,
+  meaningful value — "use real AWS" — so their defaults are `""` and
+  convert to None. Distinction kept, not flattened.)
+- **Typed parsing kills two scaffold hazards at once.**
+  `DEBUG = env_bool("DJANGO_DEBUG", False)` — boolean parsing means
+  the string `"False"` no longer evaluates truthy (the classic env
+  bug) and the *default is off*. `ALLOWED_HOSTS =
+  env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")` — the
+  scaffold's `*` wildcard, flagged since the project's third night,
+  is gone; hosts are an explicit comma list with a loopback-only
+  default. Safe defaults aren't a slogan here; two concrete values
+  flipped.
+- **The scaffold block is deleted** (`django-insecure` string no
+  longer exists in settings.py) — the gitleaks trap noted when the
+  file was young is disarmed before any scanner ever runs.
+
+### One region, aliased honestly
+
+```python
+AWS_REGION = env("AWS_REGION")          # now REQUIRED — no silent default
+AWS_S3_REGION_NAME = AWS_REGION          # django-storages' expected name, bound to the one source
+```
+
+Entry 23 warned that `AWS_REGION` (queue) and `AWS_S3_REGION_NAME`
+(storage) could silently disagree. The fix keeps both *names* —
+django-storages reads the second one — but binds them to a single
+source value, so drift is structurally impossible. It also promotes
+AWS_REGION to required: a deployment that forgot its region used to
+get `us-east-1` by quiet default; now it gets a startup error,
+which is the kinder failure.
+
+### The token leaves the committed tree
+
+The LocalStack service no longer carries a literal auth token in
+`docker-compose.yml` (flagged in entry 17 as "if real, rotate and
+move"). It now reads `env_file: .env.localstack` — a dedicated file
+for that one service. The `.gitignore` pattern is the mature part:
+
+```gitignore
+.env
+.env.*
+!.env.example
+!.env.localstack.example
+```
+
+All real env files are ignored by glob; only the *examples* are
+un-ignored and tracked — including a `.env.localstack.example`
+template, so a fresh clone knows the file must exist and what
+belongs in it. Isolation bonus: the main `.env` (Django secrets, DB
+password) is no longer the file the LocalStack container needs, and
+vice versa; each service mounts the smallest env it requires.
+
+### Status
+
+Config surface is now: every value from env, required values fail
+fast at boot, types parsed, defaults safe, one region, secrets
+isolated per service. Phase 4 remaining: multi-stage Dockerfile.
+Backlog unchanged elsewhere. The nightly programme has visibly
+re-ordered itself (Dockerfile was scheduled before this audit) —
+progress is being judged from the repo, per usual.
+
+### Article angles
+
+- "Empty string is not a value: fail-fast env readers"
+- "The string 'False' is truthy: why env booleans need a parser"
+- "One source, two names: aliasing config instead of duplicating it"
+- ".gitignore as a security control: glob the secrets, whitelist the examples"
+- "Safe defaults are decisions: DEBUG off and loopback hosts as the factory settings"
