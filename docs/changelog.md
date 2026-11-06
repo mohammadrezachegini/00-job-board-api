@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — docs: technical notes entry 31 — env config hardening (315d682)
+- 2026-11-06 — docs: update changelog [skip changelog] (46a2b8d)
 - 2026-11-06 — docs: journal — all config from env, fail-fast typed helpers (0e4bcb3)
 - 2026-11-06 — docs: update changelog [skip changelog] (a9d0a68)
 - 2026-11-06 — All config from env: required/empty fail fast, typed helpers, safe defaults, one AWS_REGION; LocalStack token isolated (8fe0d61)
