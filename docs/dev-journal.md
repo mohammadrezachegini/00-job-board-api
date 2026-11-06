@@ -323,3 +323,14 @@ This journal is updated as new work is pushed.
   prove the idempotency design, and the "What Broke" section gains
   two honest Phase 3 entries. Brief note in `docs/technical-notes.md`,
   entry 27.
+- 2026-11-05 (commit `7e465b8`, "Add /healthz and /readyz with
+  bounded dependency checks; resilient worker; restart policy"):
+  Phase 4 opens with operability. `/healthz` answers "is the process
+  alive" and `/readyz` actually checks PostgreSQL, Redis and the
+  queue, reporting each with its timing — only the database can mark
+  the service not-ready, matching how the app already degrades
+  gracefully without cache or queue. The worker stops dying on queue
+  outages: failed receives now retry after a pause, failed deletes are
+  logged for the redelivery that idempotency already makes safe. Both
+  services get a restart policy. Technical breakdown in
+  `docs/technical-notes.md`, entry 28.
