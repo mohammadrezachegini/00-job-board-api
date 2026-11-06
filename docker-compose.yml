@@ -29,7 +29,9 @@ services:
       retries: 20
   
   worker:
-    build: .
+    build:
+      context: .
+      target: runtime
     command: ["python", "-m", "worker.run_worker"]
     env_file: .env
     volumes:
@@ -52,7 +54,9 @@ services:
       retries: 10
 
   api:
-    build: .
+    build:
+      context: .
+      target: runtime
     command: ["python", "manage.py", "runserver", "0.0.0.0:8006"]
     env_file: .env
     ports:
@@ -67,6 +71,18 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+
+  test:
+    build:
+      context: .
+      target: test
+    profiles: ["test"]
+    env_file: .env
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
   
   
 
