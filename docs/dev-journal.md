@@ -334,3 +334,11 @@ This journal is updated as new work is pushed.
   logged for the redelivery that idempotency already makes safe. Both
   services get a restart policy. Technical breakdown in
   `docs/technical-notes.md`, entry 28.
+- 2026-11-05 (commit `b0cf235`, "Add /metrics via django-prometheus"):
+  the API now exposes Prometheus metrics at `/metrics` — request
+  counts and latency histograms per view, plus per-connection
+  database query metrics, collected by middleware wrapped around the
+  whole request stack. Next to `/healthz` and `/readyz`, that
+  completes the classic probe-and-metrics surface an orchestrator
+  (and Project 02's Prometheus/Grafana stack) expects. Technical
+  breakdown in `docs/technical-notes.md`, entry 29.
