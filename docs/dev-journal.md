@@ -378,3 +378,11 @@ This journal is updated as new work is pushed.
   to runserver with the code bind-mounted. With this, Phase 4's
   build-and-operate list is complete. Technical breakdown in
   `docs/technical-notes.md`, entry 32.
+- 2026-11-06 (commit `00e0f7e`, "Update README for Phase 4"): the
+  README catches up with Phase 4 — status line, architecture diagram,
+  operations features, environment table (including the gunicorn
+  knobs and why workers stay at 1), a production-image runbook, and a
+  manual-checks list with measured numbers: readiness answering in
+  about a second against a frozen dependency, a 343 MB image, a
+  half-second graceful stop. Brief note in
+  `docs/technical-notes.md`, entry 33.
