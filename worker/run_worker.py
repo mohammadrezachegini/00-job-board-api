@@ -38,9 +38,7 @@ def handle(message):
 
 
 def main():
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-    )
+
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
@@ -60,12 +58,18 @@ def main():
             try:
                 handle(message)
             except Exception:
-                logger.exception("Failed to handle message %s; it will be retried", message.id)
+                logger.exception(
+                    "Failed to handle message %s; it will be retried", message.id,
+                    extra={"message_id": message.id},
+                )
                 continue
             try:
                 queue.delete(message)
             except (BotoCoreError, ClientError):
-                logger.exception("Could not delete message %s; it will be redelivered", message.id)
+                logger.exception(
+                    "Could not delete message %s; it will be redelivered", message.id,
+                    extra={"message_id": message.id},
+                )
 
     logger.info("Worker stopped")
 
@@ -83,7 +87,8 @@ def handle_status_changed(body):
     with transaction.atomic():
         if not claim_event(body["event_id"], STATUS_CHANGED):
             logger.info(
-                "Event %s already processed; skipping duplicate", body["event_id"]
+                "Event %s already processed; skipping duplicate", body["event_id"],
+                extra={"event": STATUS_CHANGED, "event_id": body["event_id"]},
             )
             return
 
@@ -96,6 +101,11 @@ def handle_status_changed(body):
                 "Application %s no longer exists; skipping (event %s)",
                 body["application_id"],
                 body["event_id"],
+                extra={
+                    "event": STATUS_CHANGED,
+                    "event_id": body["event_id"],
+                    "application_id": body["application_id"],
+                },
             )
             return
 
@@ -108,6 +118,14 @@ def handle_status_changed(body):
         body["old_status"],
         body["new_status"],
         body["event_id"],
+        extra={
+            "event": STATUS_CHANGED,
+            "event_id": body["event_id"],
+            "application_id": application.id,
+            "user_id": application.candidate.user_id,
+            "old_status": body["old_status"],
+            "new_status": body["new_status"],
+        },
     )
 
 

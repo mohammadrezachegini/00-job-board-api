@@ -30,6 +30,7 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
+from pythonjsonlogger.core import RESERVED_ATTRS
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -196,4 +197,34 @@ SIMPLE_JWT = {
 STORAGES = {
     "default": {"BACKEND": "storages.backends.s3.S3Storage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
+LOG_LEVEL = env("LOG_LEVEL", "INFO").upper()
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.json.JsonFormatter",
+            "fmt": "%(levelname)s %(name)s %(message)s",
+            "rename_fields": {"levelname": "level", "name": "logger"},
+            "timestamp": True,
+            "reserved_attrs": [*RESERVED_ATTRS, "request"],
+        },
+    },
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+            "formatter": "json",
+        },
+    },
+    "root": {"handlers": ["stdout"], "level": LOG_LEVEL},
+    "loggers": {
+        "django": {"handlers": ["stdout"], "level": LOG_LEVEL, "propagate": False},
+        "django.server": {"handlers": ["stdout"], "level": "INFO", "propagate": False},
+        "botocore": {"level": "WARNING"},
+        "urllib3": {"level": "WARNING"},
+    },
 }

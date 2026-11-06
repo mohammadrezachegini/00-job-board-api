@@ -28,10 +28,23 @@ def publish_status_changed(application, old_status):
                 STATUS_CHANGED,
                 application.id,
                 message_id,
+                extra={
+                    "event": STATUS_CHANGED,
+                    "event_id": body["event_id"],
+                    "application_id": application.id,
+                    "message_id": message_id,
+                },
             )
         except (BotoCoreError, ClientError):
             logger.exception(
-                "Could not queue %s for application %s", STATUS_CHANGED, application.id
+                "Could not queue %s for application %s",
+                STATUS_CHANGED,
+                application.id,
+                extra={
+                    "event": STATUS_CHANGED,
+                    "event_id": body["event_id"],
+                    "application_id": application.id,
+                },
             )
 
     transaction.on_commit(send)
