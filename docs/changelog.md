@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — Multi-stage Dockerfile, non-root user, gunicorn (gthread, JSON logs); Compose keeps runserver for dev (4cb2e82)
+- 2026-11-06 — docs: update changelog [skip changelog] (4bab012)
 - 2026-11-06 — docs: technical notes entry 31 — env config hardening (315d682)
 - 2026-11-06 — docs: update changelog [skip changelog] (46a2b8d)
 - 2026-11-06 — docs: journal — all config from env, fail-fast typed helpers (0e4bcb3)
