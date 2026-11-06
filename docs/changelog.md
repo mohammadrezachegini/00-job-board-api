@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — docs: technical notes entry 32 — multi-stage Dockerfile, gunicorn; Phase 4 complete (118b884)
+- 2026-11-06 — docs: journal — multi-stage Dockerfile, gunicorn (1be6ab7)
+- 2026-11-06 — docs: update changelog [skip changelog] (293bc73)
 - 2026-11-06 — Multi-stage Dockerfile, non-root user, gunicorn (gthread, JSON logs); Compose keeps runserver for dev (4cb2e82)
 - 2026-11-06 — docs: update changelog [skip changelog] (4bab012)
 - 2026-11-06 — docs: technical notes entry 31 — env config hardening (315d682)
