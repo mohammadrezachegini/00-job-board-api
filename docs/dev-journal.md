@@ -406,3 +406,11 @@ This journal is updated as new work is pushed.
   cache per test, and a fast password hasher so creating test users
   stays cheap. Technical breakdown in `docs/technical-notes.md`,
   entry 35.
+- 2026-11-06 (commit `6de9e76`, "API tests"): the behavioural suite
+  lands — 36 tests across registration and the JWT flow, jobs, and
+  applications. Registration role-locking, case-insensitive duplicate
+  rejection, token-type confusion, skill normalization, filters,
+  pagination, duplicate applications, the hidden resume path, and the
+  publish-exactly-once-on-change rule are all pinned at HTTP level.
+  Phase 5's test pyramid now has its unit, permission and API layers.
+  Technical breakdown in `docs/technical-notes.md`, entry 36.
