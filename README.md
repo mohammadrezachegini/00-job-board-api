@@ -6,14 +6,14 @@ A Django REST API where companies post jobs and candidates apply with a resume. 
 - cached job search;
 - a background worker that emails candidates when their application status changes.
 
-It's built to be operated: health and readiness probes, Prometheus metrics, JSON logs, configuration from environment variables only, and a non-root production image. Stack: PostgreSQL, Redis, SQS, gunicorn and Docker.
+It's built to be operated and maintained: health and readiness probes, Prometheus metrics, JSON logs, configuration from environment variables only, and a non-root production image. A 203-test suite at 100% coverage runs with one command, and the API is documented in OpenAPI with Swagger UI.
 
-> **Status:** Phase 4 (operations-ready) complete. Runs locally, with S3 and SQS emulated by LocalStack. Automated tests, the Azure path and cloud deployment come in later phases.
+> **Status:** Phase 5 (tests and docs) complete. Runs locally, with S3 and SQS emulated by LocalStack. The Azure path and cloud deployment come in later phases.
 
 ## Architecture
 
 ```text
-Client (curl / frontend)                         Kubernetes probes / Prometheus (later)
+Client (curl / frontend / Swagger UI)            Kubernetes probes / Prometheus (later)
    │  JWT (Authorization: Bearer <token>)              │  /healthz  /readyz  /metrics
    ▼                                                   ▼
 ┌──────────────────────────────────── Docker Compose ─────────────────────────────────────┐
@@ -25,6 +25,7 @@ Client (curl / frontend)                         Kubernetes probes / Prometheus 
 │   ├── /api/jobs/...          search + filters (cached in Redis), post, update, applicants│
 │   ├── /api/applications/...  apply with resume, detail + match score,                   │
 │   │                          status change, resume download link                        │
+│   ├── /api/schema/           OpenAPI 3 schema;  /api/schema/swagger-ui/  interactive docs│
 │   ├── /healthz               liveness: process is up (checks nothing else)              │
 │   ├── /readyz                readiness: Postgres (critical), Redis, SQS (~1 s each)     │
 │   └── /metrics               requests, latency, DB queries (Prometheus format)          │
@@ -36,10 +37,13 @@ Client (curl / frontend)                         Kubernetes probes / Prometheus 
 │        ▼  hostname "db"                        │                                        │
 │  db   (PostgreSQL 17)  ◀───────────────────────┤                                        │
 │        ▲                                       ▼ long poll                              │
-│        └────────────────────────────── worker  (same image, python -m worker.run_worker)│
-│                                          ├── claims event_id (ProcessedEvent, unique)   │
-│                                          ├── sends status email (console backend)       │
-│                                          └── survives queue outages, restarts on crash  │
+│        ├────────────────────────────── worker  (same image, python -m worker.run_worker)│
+│        │                                 ├── claims event_id (ProcessedEvent, unique)   │
+│        │                                 ├── sends status email (console backend)       │
+│        │                                 └── survives queue outages, restarts on crash  │
+│        │                                                                                │
+│        └──── test  (profile "test": pytest in a test image; own test_jobboard database; │
+│                     Redis and AWS faked in-process: LocMemCache + moto)                 │
 │                                                                                         │
 │  All processes: JSON logs on stdout; config only from environment variables             │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
@@ -60,31 +64,26 @@ Client (curl / frontend)                         Kubernetes probes / Prometheus 
 - Job search and filters: type, location, skills, free-text search, ordering. Invalid filter values return 400.
 - **Cached job search:**
   - results are cached in Redis for 60 seconds;
-  - the cache is invalidated immediately when any job or company changes (from the API, the admin or the shell);
+  - the cache is invalidated when a job or company change is committed;
   - responses carry an `X-Cache: HIT/MISS` header;
   - the API keeps working if Redis is down or frozen.
 - **Background worker:** a status change publishes an event to SQS after the database commit, and a separate worker emails the candidate.
 - **Reliable processing:**
-  - at-least-once delivery with a 30-second visibility timeout;
-  - a dead-letter queue after 3 failures;
-  - graceful shutdown on `SIGTERM`;
+  - at-least-once delivery, a dead-letter queue after 3 failures, graceful shutdown;
   - **idempotent** handling, so a redelivered message never sends a second email.
-- **Health and readiness probes:**
-  - `/healthz` only says "the process is alive";
-  - `/readyz` checks each dependency within about 1 second and returns `503` only if PostgreSQL is down. Redis and SQS failures are reported, but the API keeps serving.
-- **Prometheus metrics** at `/metrics`: requests by view, method and status; latency histograms; database queries and errors.
-- **Structured JSON logs** on stdout, from Django, the worker and gunicorn:
-  - a traceback is one `exc_info` field;
-  - the same `event_id` links the API's "queued" line to the worker's "emailed" line.
-- **Configuration from environment variables only:**
-  - a required variable that is missing **or empty** stops startup with a clear message;
-  - safe defaults (`DEBUG` off, local hosts only);
-  - the LocalStack token is visible only to the LocalStack container.
+- **Operations:**
+  - `/healthz` (liveness) and `/readyz` (readiness, ~1 s budget per dependency);
+  - Prometheus metrics;
+  - JSON logs with correlation IDs;
+  - configuration from environment variables only (missing or empty required values stop startup).
 - **Production image:** multi-stage build, non-root user, read-only code, gunicorn as PID 1 with a graceful stop.
-- **Resilience:**
-  - every Redis and SQS call has a time limit;
-  - the worker keeps running through queue outages;
-  - API and worker restart automatically if they crash.
+- **Tests:**
+  - 203 tests, one command, **100% line coverage**;
+  - the run **fails below 80%**;
+  - AWS faked with moto, and no Redis or LocalStack needed.
+- **API docs:**
+  - an OpenAPI 3 schema and Swagger UI, with the JWT **Authorize** flow;
+  - tests fail on any schema warning, and check that key operations document the right shapes.
 
 ## Tech Stack
 
@@ -102,21 +101,25 @@ Client (curl / frontend)                         Kubernetes probes / Prometheus 
 | Web server | gunicorn 26 (`gthread`) in the image; Django `runserver` for local development |
 | Metrics | django-prometheus (prometheus_client) |
 | Logging | python-json-logger |
+| API docs | drf-spectacular (OpenAPI 3, Swagger UI) |
+| Testing | pytest, pytest-django, pytest-cov, moto |
 | Local AWS | LocalStack (S3, SQS) |
 | Dependencies | uv (`pyproject.toml` + `uv.lock`) |
-| Containers | Docker (multi-stage, non-root), Docker Compose |
+| Containers | Docker (multi-stage: builder / test / runtime, non-root), Docker Compose |
 
 ## Cloud Services
 
 | Purpose | AWS | Azure |
 | --- | --- | --- |
-| Resume storage | S3 (LocalStack locally) | — (Azure phase: Blob Storage) |
-| Status-change queue | SQS + DLQ (LocalStack locally) | — (Azure phase: Service Bus) |
+| Resume storage | S3 (LocalStack locally; moto in tests) | — (Azure phase: Blob Storage) |
+| Status-change queue | SQS + DLQ (LocalStack locally; moto in tests) | — (Azure phase: Service Bus) |
 | Job search cache | ElastiCache target (Redis container locally) | — (Azure phase: Azure Cache for Redis) |
 
 No AWS resources are provisioned yet. They're created with Terraform in Project 01.
 
 ## API Endpoints
+
+Full, interactive documentation: **`/api/schema/swagger-ui/`** (schema: `/api/schema/`).
 
 | Method | Path | Who | Description |
 | --- | --- | --- | --- |
@@ -128,18 +131,17 @@ No AWS resources are provisioned yet. They're created with Terraform in Project 
 | POST | `/api/jobs/` | verified company | Post a job |
 | GET | `/api/jobs/{id}/` | any user | Job detail |
 | PUT / PATCH | `/api/jobs/{id}/` | job owner | Update or close a job |
-| GET | `/api/jobs/{id}/applications/` | job owner | Applicants, with match scores |
+| GET | `/api/jobs/{id}/applications/` | job owner | Applicants, with match scores (paginated) |
 | POST | `/api/applications/` | candidate | Apply (multipart, with `resume` file) |
 | GET | `/api/applications/{id}/` | applicant or job owner | Application detail + match score |
 | PATCH | `/api/applications/{id}/status/` | job owner | Change status; queues an email to the candidate |
-| GET | `/api/applications/{id}/resume/` | applicant or job owner | Presigned resume download URL (5 min) |
-| GET | `/healthz` | no token | Liveness: `200 {"status": "ok"}` |
-| GET | `/readyz` | no token | Readiness: `200` or `503`, with per-dependency status and timing |
-| GET | `/metrics` | no token | Prometheus metrics |
+| GET | `/api/applications/{id}/resume/` | applicant or job owner | Presigned resume download URL (5 min); 404 if none |
+| GET | `/api/schema/` · `/api/schema/swagger-ui/` | public | OpenAPI schema and interactive docs |
+| GET | `/healthz` · `/readyz` · `/metrics` | no token | Liveness, readiness, Prometheus metrics |
 
 "Any user" means any logged-in user. Wrong user types get `403`; missing or expired tokens get `401`.
 
-The three operations endpoints have no authentication, like most probe and scrape endpoints. They must not be exposed publicly: in Kubernetes, the Ingress will route only `/api/`.
+The operations endpoints (`/healthz`, `/readyz`, `/metrics`) have no authentication, like most probe and scrape endpoints. They must not be exposed publicly: in Kubernetes, the Ingress will route only `/api/`.
 
 ## Setup
 
@@ -159,7 +161,7 @@ docker compose exec api python manage.py migrate
 docker compose exec api python manage.py createsuperuser
 ```
 
-- API: `http://localhost:8006/api/`; admin: `http://localhost:8006/admin/`; probes: `/healthz`, `/readyz`; metrics: `/metrics`.
+- API: `http://localhost:8006/api/`. Docs: `http://localhost:8006/api/schema/swagger-ui/`. Admin: `http://localhost:8006/admin/`.
 - Wait for `curl -s http://localhost:8006/healthz` to answer before testing. `docker compose up -d` returns before the server is listening.
 - To reach the API from another machine, add the address that machine uses (e.g. the host's LAN IP) to `DJANGO_ALLOWED_HOSTS`.
 - Companies must be verified (admin → Companies → "Is verified") before they can post jobs.
@@ -167,6 +169,12 @@ docker compose exec api python manage.py createsuperuser
 - The worker doesn't auto-reload: run `docker compose restart worker` after code changes.
 - LocalStack keeps no data when its container is recreated: re-upload resumes afterwards.
 - Stop: `docker compose down` (keeps the database). Delete the database too: `docker compose down -v`.
+
+**Run the tests:**
+
+```bash
+docker compose run --rm test
+```
 
 **Run the production image** (gunicorn, no source mount, env vars only):
 
@@ -210,37 +218,50 @@ A variable with no default is **required**. If it's missing **or empty**, the ap
 
 ## Testing
 
-Automated tests (pytest, 80%+ coverage) are planned for Phase 5. Phases 1–4 were verified with manual checks over HTTP, in the Django shell, against Redis and SQS, and against the built image. The full list is in `docs/` (terminal checks).
+```bash
+docker compose run --rm test
+```
 
-Phase 4 checks included:
-- **Readiness:**
-  - PostgreSQL stopped → `/healthz` 200, `/readyz` 503;
-  - Redis or SQS stopped or **frozen** (`docker compose pause`) → `/readyz` still 200 within about 1 second, with the failing dependency named.
-- **The worker:** it kept running while SQS was down, and a worker started during an outage recovered on its own once SQS came back.
-- **Metrics:** counters checked before and after a known number of requests.
-- **Logs:** every line parsed as JSON, and one `event_id` traced from the API log to the worker log.
-- **Configuration:**
-  - missing and empty required variables stop startup;
-  - an unknown `Host` header gets 400;
-  - the image refuses to start with no environment at all.
-- **The production image, with no source mount and env vars only:**
-  - runs as a non-root user and can't write to its own code;
-  - serves health, readiness, metrics and the API;
-  - stops cleanly on `SIGTERM`.
+- **One command:** pytest in a `test` image (runtime + dev dependencies), on the Compose network, with the code bind-mounted. Only PostgreSQL has to be running.
+- **Result:** **203 tests**, about 6 seconds, **100% line coverage**. `--cov-fail-under=80` makes the run **fail below 80%**, even if every test passes.
+- **Isolation:**
+  - pytest-django creates a separate `test_jobboard` database, and each test runs in a transaction that's rolled back;
+  - Redis is replaced by an in-memory cache per test;
+  - S3 and SQS by **moto** (in-process fakes; the tests pass with LocalStack stopped).
+
+| Area | What the tests prove |
+| --- | --- |
+| Models, match score, resume validator | Constraints enforced by PostgreSQL, rounding, file signatures, the 5 MB boundary, random S3 keys |
+| Permissions | Each class on its own, plus a who-can-do-what matrix over every protected endpoint. Denied writes change nothing |
+| API | Registration (atomic, role can't be chosen), the real JWT flow, validation, filters, ordering, pagination |
+| S3 / SQS (moto) | Upload, privacy, presigned links; a status change is published **only after commit**, and never on rollback |
+| Worker | One email per event, duplicates skipped, a failed send releases the claim, the loop survives queue errors |
+| Cache | HIT/MISS, invalidation only after commit, fallback when Redis fails |
+| Readiness | 503 only when PostgreSQL is down; error class names only, never messages; liveness ignores dependencies |
+| Config | Required/empty variables fail; typed `env_bool` / `env_list` |
+| API docs | A valid schema with zero warnings; key operations document the right request and response shapes |
+
+**The tests can fail when the code is wrong.** Key areas were checked by breaking the code on purpose (removing an owner check, sending an event before commit, invalidating the cache too early, dropping skill normalisation). In each case, exactly the expected tests failed.
+
+```bash
+docker compose run --rm test pytest -q --no-cov jobs/tests/test_permissions.py   # one file, no coverage
+docker compose run --rm test pytest -k "cache" -v --no-cov                       # by name
+```
 
 ## Project Structure
 
 ```text
 00-job-board-api/
 ├── config/
-│   ├── settings.py          ← config from env vars (required/optional, typed); DRF, JWT, S3, Redis, SQS, email, JSON logging
-│   ├── urls.py              ← /api/, /healthz, /readyz, /metrics
-│   └── wsgi.py              ← gunicorn entry point
+│   ├── settings.py          ← config from env vars (required/optional, typed); DRF, JWT, S3, Redis, SQS, email, JSON logging, OpenAPI
+│   ├── urls.py              ← /api/, /api/schema/, /healthz, /readyz, /metrics
+│   ├── wsgi.py              ← gunicorn entry point
+│   └── tests/               ← settings helper tests
 ├── jobs/
 │   ├── models.py            ← User, Company, CandidateProfile, Job, Application, ProcessedEvent
-│   ├── serializers.py
-│   ├── views.py             ← JobViewSet (cached list), ApplicationViewSet (status → event)
-│   ├── permissions.py       ← IsVerifiedCompany, IsCandidate, IsJobOwner, IsApplicationOwner
+│   ├── serializers.py       ← incl. RegisteredUserSerializer, ResumeLinkSerializer (responses + docs)
+│   ├── views.py             ← JobViewSet (cached list), ApplicationViewSet (status → event); @extend_schema
+│   ├── permissions.py       ← IsVerifiedCompany, IsCandidate, IsJobOwner, IsApplicantOwner
 │   ├── matching.py          ← skill match score
 │   ├── filters.py           ← JobFilter
 │   ├── validators.py        ← resume checks
@@ -251,7 +272,8 @@ Phase 4 checks included:
 │   ├── emails.py            ← status-change email
 │   ├── templates/emails/status_changed.txt
 │   ├── apps.py              ← registers signals
-│   └── migrations/
+│   ├── migrations/
+│   └── tests/               ← conftest.py (fixtures, moto) + 15 test modules
 ├── cloud/
 │   ├── queue.py             ← Queue interface + SQS implementation (timeouts, fast ping client)
 │   └── health.py            ← /healthz and /readyz
@@ -261,12 +283,12 @@ Phase 4 checks included:
 │   ├── create-bucket.sh
 │   └── create-queues.sh     ← queue + DLQ with redrive policy
 ├── scripts/dev-helper.sh    ← local test helpers
-├── docs/
-├── Dockerfile               ← multi-stage (uv builder → slim runtime), non-root, gunicorn
+├── docs/                    ← terminal checks (manual verification commands)
+├── Dockerfile               ← builder → builder-test → base → test → runtime (default)
 ├── gunicorn.conf.py         ← process model, timeouts, JSON logs
-├── docker-compose.yml       ← api (runserver for dev), worker, PostgreSQL, Redis, LocalStack
+├── docker-compose.yml       ← api (runserver for dev), worker, test (profile), PostgreSQL, Redis, LocalStack
 ├── .env.example / .env.localstack.example
-├── pyproject.toml / uv.lock / .python-version
+├── pyproject.toml / uv.lock / .python-version    ← dependencies, pytest + coverage config (80% gate)
 └── manage.py
 ```
 
@@ -279,18 +301,19 @@ Phase 4 checks included:
 - **Versioned cache keys:** one atomic `INCR` invalidates every cached search page; old keys expire on their own.
 - **Side effects only after commit** (`transaction.on_commit`), for both cache invalidation and queue messages. A rolled-back change never invalidates the cache or emails anyone.
 - **SQS locally through LocalStack,** not a Redis list: the same code runs locally and on AWS, with real redelivery and a DLQ.
-- **Messages carry IDs, not personal data:** the worker reads current data from the database. Logs carry IDs too, never email addresses.
+- **Messages and logs carry IDs, not personal data.** The worker reads current data from the database.
 - **Idempotency in the database:** a unique `event_id` is claimed in the same transaction as the send. Duplicates are skipped, and failed sends release the claim.
 - **A queue interface (`cloud/queue.py`),** so Azure Service Bus can replace SQS without touching the API or the worker.
-- **Liveness checks nothing; readiness fails only on PostgreSQL.** A database outage takes instances out of traffic instead of restarting them in a loop. Redis and SQS problems are reported, because the API can work around them.
-- **Every dependency call has a time budget:**
-  - Redis socket timeouts;
-  - a separate SQS client for health checks (1 s, one attempt, no retry);
-  - a long-poll client with a 30 s read timeout.
+- **Liveness checks nothing; readiness fails only on PostgreSQL.** A database outage takes instances out of traffic instead of restarting them in a loop.
+- **Every dependency call has a time budget:** Redis socket timeouts, a separate 1-second SQS client for health checks, and a long-poll client for the worker.
 - **One gunicorn process with threads per container;** scale with more containers. In-process Prometheus counters stay correct without multiprocess mode.
 - **12-factor configuration:** what varies between deployments comes from the environment; tuning values that are the same everywhere stay in code.
 - **Least privilege:** a non-root user, code owned by root, and secrets only in the container that needs them.
 - **One image for development and production:** gunicorn by default, `runserver` through a Compose override.
+- **Tests in a container,** with a dedicated `test` image stage. The production image ships no test tools; tests need PostgreSQL only.
+- **Fakes at the edges:** moto for AWS and an in-memory cache for Redis. Each test gets fresh, isolated state, and the suite runs without the network.
+- **Coverage as a gate,** not a number someone reads: 80% enforced, 100% reached. One narrow exclusion (`if __name__ == "__main__":`).
+- **API docs generated from the code,** with the response serializers reused in the docs, so the two can't drift. Schema tests check content, not just validity.
 
 ## What Broke and How I Fixed It
 
@@ -302,38 +325,41 @@ Phase 4 checks included:
 - **A misspelled hook,** `get_permission`, let an unverified company post a job.
 - **Every presigned URL failed,** because the fake AWS keys were `change-me` instead of LocalStack's `test`. Found from S3's XML error body.
 - **A test that passed for the wrong reason:** a tampered link returned 403, but so did the valid one.
-- Also:
-  - `lookup_expr` vs `method` on a filter (500);
-  - the view's `ordering` missing its `-`;
-  - `url_path="set-status"` (404);
-  - empty status bodies accepted with 200.
 
 **Phase 3**
-- **Cache invalidation did nothing.** The version-bump function was defined but never passed to `transaction.on_commit`, so it was never called and nothing errored. Users would have seen stale job lists for up to 60 seconds. It was found by checking the version number **before and after** a save, not just the final response.
-- **The API logged nothing at INFO level** (no `LOGGING` config), so a check grepping for an INFO line could never succeed. Fixed in Phase 4 with JSON logging.
+- **Cache invalidation did nothing.** The version-bump function was defined but never passed to `transaction.on_commit`. It was found by checking the version number before and after a save.
 
 **Phase 4**
-- **The readiness check hung for more than 90 seconds when LocalStack was frozen.** No call had a timeout. The fix was:
-  - Redis socket timeouts;
-  - a fast, separate SQS client for the probe;
-  - no network call in the queue's constructor.
-- **`max_attempts: 1` meant two attempts.** In botocore's retry config, `max_attempts` counts *retries*, so the "one-try" probe took 2.3–3.0 s. Switching to `total_max_attempts` brought it to about 1 second.
-- **Health endpoints answered 301 instead of running.** A trailing slash in the URL patterns let `APPEND_SLASH` redirect every probe, and Kubernetes counts redirects as success.
-- **A `return` indented inside the loop** made `/readyz` check only the database. Found because freezing Redis and SQS changed nothing.
-- **The worker crashed on any queue error.** Fixed with error handling around receive and delete, plus a restart policy. The policy only applied after `docker compose up -d`, because `restart` reuses the old container.
+- **The readiness check hung for more than 90 seconds when LocalStack was frozen.** No call had a timeout. Fixed with Redis socket timeouts, a fast separate SQS client, and no network call in the queue's constructor.
+- **`max_attempts: 1` meant two attempts.** In botocore's retry config, `max_attempts` counts *retries*. Switching to `total_max_attempts` brought the probe to about 1 second.
+- **Health endpoints answered 301** (a trailing slash + `APPEND_SLASH`), which Kubernetes counts as success.
+- **The worker crashed on any queue error.** Fixed with error handling plus a restart policy, which only applied after `docker compose up -d`.
 - **The configuration audit found:**
-  - a region variable the code never read (`AWS_S3_REGION` vs `AWS_S3_REGION_NAME`);
+  - a region variable the code never read;
   - `ALLOWED_HOSTS = *`;
   - the original secret key still in a comment;
-  - the LocalStack token inside the API and worker containers.
-- **A test of the image ran stale code.** The bind mount had hidden that the image wasn't rebuilt. Testing the image with no mount caught it.
+  - the LocalStack token inside the API containers.
+- **A test of the image ran stale code,** hidden by the bind mount.
+
+**Phase 5**
+- **The suite got 10× slower** after the permission tests (27.13 s). `--durations` pointed at fixture setup: PBKDF2 password hashing for about 160 test users. A fast hasher in tests only brought it to 0.92 s.
+- **Tests passed but errored at teardown.** They patched Django's `cache` *proxy*, and by the time the patch was undone, the proxy pointed at a different cache. Patching the real backend (`caches["default"]`) fixed it.
+- **Coverage revealed two checks that could never run** (role checks already guaranteed by the permission classes). They were deleted; the permission matrix still passes.
+- **The generated API schema was valid, warning-free, and wrong in 4 places.** drf-spectacular silently fell back to the view's serializer for custom actions. Found by printing what the schema says per operation; fixed with `@extend_schema`, and locked in by schema tests.
+
+## Known Limitations
+
+- **A duplicate application in a race leaves an orphaned resume in S3.** The file is uploaded before the database rejects the duplicate (pinned by a test).
+- **If SQS is down when a status changes, the email event is lost** (logged, not retried). A transactional outbox would fix it.
+- **The status-change `PATCH` shows `status` as optional in the docs.** drf-spectacular treats every `PATCH` as partial. The API does require it (400 without it, tested).
 
 ## Measured Results
 
 All numbers are from single runs on the local machine (thor).
 
-- **Readiness check with a frozen dependency:** more than 90 s (curl killed at 90 s) → **1.02–1.06 s** with time limits and no retry. With Redis frozen: `/readyz` 1.03 s, and the job list still served (200) in 1.03 s.
-- **Production image:** 394 MB → **343 MB** after the multi-stage build.
-- **Graceful stop of the production container:** `time docker stop` → **0.50 s** (gunicorn handles `SIGTERM` as PID 1).
-- **Worker graceful shutdown:** about 12–19 s. It finishes the current 20-second long poll, inside the 30-second grace period (`11.9 s` in Phase 3; `18.8 s` from the Phase 4 logs).
+- **Test suite:** 203 tests in **6.15 s**, **100%** line coverage (687 statements).
+- **Fast password hashing in tests:** 80 tests went from 27.13 s to **0.92 s**.
+- **Readiness check with a frozen dependency:** more than 90 s (curl killed at 90 s) → **1.02–1.06 s** with time limits and no retry.
+- **Production image:** 394 MB → **343 MB** after the multi-stage build. The test image is 365 MB and is never deployed.
+- **Graceful stop of the production container:** `time docker stop` → **0.50 s**.
 - **Error page with `DEBUG=False`:** 143 bytes, compared with a 68 KB debug page when `DEBUG=True`.
