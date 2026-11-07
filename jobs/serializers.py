@@ -9,6 +9,17 @@ from . import matching
 User = get_user_model()
 
 
+class RegisteredUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+    role = serializers.ChoiceField(choices=User.Role.choices, read_only=True)
+
+
+class ResumeLinkSerializer(serializers.Serializer):
+    url = serializers.URLField(read_only=True)
+    expires_in = serializers.IntegerField(read_only=True, help_text="Seconds until the link stops working.")
+
 class BaseRegistrationSerializer(serializers.Serializer):
     username = serializers.CharField(
         max_length=150, validators=[UnicodeUsernameValidator()]
@@ -42,12 +53,7 @@ class BaseRegistrationSerializer(serializers.Serializer):
         )
 
     def to_representation(self, user):
-        return {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "role": user.role,
-        }
+        return RegisteredUserSerializer(user).data
 
 
 class CompanyRegistrationSerializer(BaseRegistrationSerializer):
@@ -127,10 +133,10 @@ class ApplicationSerializer(serializers.ModelSerializer):
         validators = []
         extra_kwargs = {"resume": {"required": True, "write_only": True}}
 
-    def get_has_resume(self, obj):
+    def get_has_resume(self, obj) -> bool:
         return bool(obj.resume)
 
-    def get_match_score(self, obj):
+    def get_match_score(self, obj) -> int | None:
         return matching.match_score(obj.job.required_skills, obj.candidate.skills)
 
     def validate_job(self, job):

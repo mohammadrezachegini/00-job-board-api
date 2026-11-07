@@ -2,7 +2,7 @@ from django.db import IntegrityError, transaction
 from django.conf import settings
 from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
@@ -13,6 +13,7 @@ from .storage import resume_download_url
 from .models import Application, Job
 from .filters import JobFilter
 from .events import publish_status_changed
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 
 import logging
 
@@ -27,17 +28,19 @@ from .serializers import (
     CandidateRegistrationSerializer,
     CompanyRegistrationSerializer,
     JobSerializer,
+    RegisteredUserSerializer,
+    ResumeLinkSerializer,
 )
 
 logger = logging.getLogger(__name__)
 
-
+@extend_schema(responses={201: RegisteredUserSerializer})
 class CompanyRegisterView(generics.CreateAPIView):
     serializer_class = CompanyRegistrationSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
 
-
+@extend_schema(responses={201: RegisteredUserSerializer})
 class CandidateRegisterView(generics.CreateAPIView):
     serializer_class = CandidateRegistrationSerializer
     permission_classes = [AllowAny]
@@ -73,10 +76,9 @@ class JobViewSet(
         return queryset
 
     def perform_create(self, serializer):
-        if not self.request.user.is_company:
-            raise PermissionDenied("Only company users can create jobs.")
         serializer.save(company=self.request.user.company)
-
+        
+    @extend_schema(responses=ApplicationSerializer(many=True))
     @action(detail=True, methods=["get"])
     def applications(self, request, pk=None):
         job = self.get_object()
@@ -126,14 +128,13 @@ class ApplicationViewSet(
         return super().get_permissions()
 
     def perform_create(self, serializer):
-        if not self.request.user.is_candidate:
-            raise PermissionDenied("Only candidate users can create applications.")
         try:
             with transaction.atomic():
                 serializer.save(candidate=self.request.user.candidate_profile)
         except IntegrityError:
             raise ValidationError({"job": "You have already applied for this job."})
 
+    @extend_schema(request=ApplicationStatusSerializer, responses=ApplicationSerializer)
     @action(detail=True, methods=["patch"], url_path="status")
     def set_status(self, request, pk=None):
         application = self.get_object()
@@ -143,16 +144,29 @@ class ApplicationViewSet(
         serializer.save()
         if application.status != old_status:
             publish_status_changed(application, old_status)
-        return Response(ApplicationSerializer(application, context=self.get_serializer_context()).data)
+        return Response(
+            ApplicationSerializer(
+                application, context=self.get_serializer_context()
+            ).data
+        )
 
+    @extend_schema(
+        responses={
+            200: ResumeLinkSerializer,
+            404: OpenApiResponse(description="This application has no resume."),
+        }
+    )
+    @action(detail=True, methods=["get"])
     @action(detail=True, methods=["get"])
     def resume(self, request, pk=None):
         application = self.get_object()
         if not application.resume:
             raise NotFound("This application has no resume.")
         return Response(
-            {
-                "url": resume_download_url(application),
-                "expires_in": settings.RESUME_URL_EXPIRE_SECONDS,
-            }
+            ResumeLinkSerializer(
+                {
+                    "url": resume_download_url(application),
+                    "expires_in": settings.RESUME_URL_EXPIRE_SECONDS,
+                }
+            ).data
         )

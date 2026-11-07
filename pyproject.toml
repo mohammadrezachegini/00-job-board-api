@@ -9,6 +9,7 @@ dependencies = [
     "django-storages[s3]>=1.14.6",
     "djangorestframework>=3.18.3",
     "djangorestframework-simplejwt>=5.5.1",
+    "drf-spectacular>=0.30",
     "gunicorn>=26.2.0",
     "psycopg[binary]>=3.3.6",
     "python-json-logger>=3.1",
@@ -25,8 +26,11 @@ dev = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py"]
-addopts = "--cov --cov-report=term-missing"
+addopts = "--cov --cov-report=term-missing --cov-fail-under=80"
 
 [tool.coverage.run]
 source = ["jobs", "cloud", "worker", "config"]
 omit = ["*/migrations/*", "*/tests/*", "config/asgi.py", "config/wsgi.py"]
+
+[tool.coverage.report]
+exclude_also = ['if __name__ == .__main__.:']

@@ -219,3 +219,7 @@ def test_resume_link_for_applicant_and_job_owner_only(client_for, world, who, ex
     response = client_for(who).get(f"/api/applications/{world.application.id}/resume/")
 
     assert response.status_code == expected
+
+@pytest.mark.parametrize(("who", "expected"), [("anon", 401), ("sam", 200), ("acme", 200)])
+def test_options_needs_a_login(client_for, who, expected):
+    assert client_for(who).options("/api/applications/").status_code == expected

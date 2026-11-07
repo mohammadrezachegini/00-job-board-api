@@ -177,3 +177,9 @@ def test_pagination(api_as, acme, make_job):
     assert first["next"].endswith("page=2")
     assert len(second["results"]) == 1
     assert second["next"] is None
+
+
+def test_skills_filter_with_only_commas_returns_everything(api_as, board):
+    response = api_as(board.user).get("/api/jobs/", {"skills": " , ,"})
+
+    assert sorted(titles(response)) == ["Data Analyst", "Junior DevOps Engineer", "SRE Intern"]
