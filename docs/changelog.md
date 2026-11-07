@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — docs: technical notes entry 34 — pytest setup, test stage, unit tests (022a68d)
+- 2026-11-06 — docs: journal — pytest setup + first unit tests (Phase 5) (f6fe1fe)
+- 2026-11-07 — docs: update changelog [skip changelog] (87dd1e6)
 - 2026-11-06 — Unit tests: match score, resume validator, models; factory fixtures (31be719)
 - 2026-11-06 — docs: update changelog [skip changelog] (07c0a3f)
 - 2026-11-06 — Add pytest, pytest-django, pytest-cov; test image stage and compose test service; smoke tests (8f81ce0)
