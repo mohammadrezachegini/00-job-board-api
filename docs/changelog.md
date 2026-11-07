@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — docs: technical notes entry 35 — permission test matrix (35d8e05)
+- 2026-11-06 — docs: journal — permission tests matrix (a421a0f)
+- 2026-11-07 — docs: update changelog [skip changelog] (81ac8a0)
 - 2026-11-06 — Permission tests: 4 classes + who-can-do-what matrix; per-test LocMem cache; fast hasher in tests (58c883a)
 - 2026-11-07 — docs: update changelog [skip changelog] (17ddbaf)
 - 2026-11-07 — docs: update changelog [skip changelog] (d7d8f6b)
