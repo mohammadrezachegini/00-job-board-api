@@ -83,3 +83,43 @@ def api_as():
         return client
 
     return _client
+
+
+
+@pytest.fixture
+def aws(settings):
+    import json
+    from types import SimpleNamespace
+
+    import boto3
+    from moto import mock_aws
+
+    from cloud.queue import get_queue
+    from jobs.storage import _public_s3_client
+
+    settings.AWS_S3_ENDPOINT_URL = None
+    settings.AWS_S3_PUBLIC_ENDPOINT_URL = None
+    settings.AWS_SQS_ENDPOINT_URL = None
+    settings.STORAGES = {**settings.STORAGES}
+    get_queue.cache_clear()
+    _public_s3_client.cache_clear()
+
+    with mock_aws():
+        s3 = boto3.client("s3", region_name=settings.AWS_REGION)
+        s3.create_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+
+        sqs = boto3.client("sqs", region_name=settings.AWS_REGION)
+        dlq_url = sqs.create_queue(QueueName=f"{settings.SQS_QUEUE_NAME}-dlq")["QueueUrl"]
+        dlq_arn = sqs.get_queue_attributes(QueueUrl=dlq_url, AttributeNames=["QueueArn"])["Attributes"]["QueueArn"]
+        queue_url = sqs.create_queue(
+            QueueName=settings.SQS_QUEUE_NAME,
+            Attributes={
+                "VisibilityTimeout": "30",
+                "RedrivePolicy": json.dumps({"deadLetterTargetArn": dlq_arn, "maxReceiveCount": "3"}),
+            },
+        )["QueueUrl"]
+
+        yield SimpleNamespace(s3=s3, sqs=sqs, queue_url=queue_url, bucket=settings.AWS_STORAGE_BUCKET_NAME)
+
+    get_queue.cache_clear()
+    _public_s3_client.cache_clear()
