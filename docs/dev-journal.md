@@ -386,3 +386,12 @@ This journal is updated as new work is pushed.
   about a second against a frozen dependency, a 343 MB image, a
   half-second graceful stop. Brief note in
   `docs/technical-notes.md`, entry 33.
+- 2026-11-06 (commits `8f81ce0` + `31be719`, pytest setup and first
+  unit tests): Phase 5 opens. pytest with pytest-django and coverage
+  is wired into the project, the Docker build gained a dedicated test
+  stage (never deployed) behind a Compose profile, and the first
+  real test suite landed in `jobs/tests/`: hand-built factory
+  fixtures plus focused unit tests for the match scorer, the resume
+  validator and the models — including boundary cases like a resume
+  of exactly 5 MB and one byte over. API tests come next. Technical
+  breakdown in `docs/technical-notes.md`, entry 34.
