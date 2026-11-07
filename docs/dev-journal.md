@@ -425,3 +425,15 @@ This journal is updated as new work is pushed.
   application rejected by the database race still leaves its uploaded
   file behind in the bucket. Technical breakdown in
   `docs/technical-notes.md`, entry 37.
+- 2026-11-06 (commit `f803c0d`, "Worker, email, cache and readiness
+  tests"): the last untested surfaces get their suites — 33 tests.
+  The worker's dedupe promises are now proven automatically (a
+  duplicate event sends no second email; a failed send releases its
+  claim so the redelivery works), the email's content and
+  header-safety are pinned, the cache contract (hit, miss,
+  invalidation after commit, outage fallback) is tested at HTTP
+  level, and the readiness rules — database critical, the rest
+  advisory, liveness ignoring everything — are locked in. Phase 5's
+  behavioural coverage is complete; what remains is the coverage
+  target and the README sync. Technical breakdown in
+  `docs/technical-notes.md`, entry 38.
