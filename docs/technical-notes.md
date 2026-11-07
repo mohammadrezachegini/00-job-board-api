@@ -1315,3 +1315,84 @@ proof), and the 80% coverage target.
 - "401 vs 403 is a spec decision: unauthenticated is not unauthorized"
 - "Two fixtures that make Django suites fast: LocMem cache and a cheap hasher"
 - "The cast pattern: one world fixture, a client_for() vending machine, rows that read like a spec"
+
+---
+
+## Entry 36 — 2026-11-06 — API tests: registration, JWT flow, jobs, applications (commit `6de9e76`)
+
+Thirty-six tests in three files, each named for the behaviour it
+guards. Read as a set, they are the API's contract written a second
+time — in the only form that can complain when the first copy drifts.
+
+### Auth: the security properties are the tests (`test_api_auth.py`)
+
+- **The server owns the role.** `test_client_cannot_choose_role_or_staff`
+  posts registration payloads trying to self-assign role and staff
+  flags and asserts the created account is neither — entry 8's
+  server-side role assignment, now under permanent guard. Its
+  companions: passwords stored hashed, weak passwords rejected by
+  the Django validators, duplicates rejected **case-insensitively**
+  (the `__iexact` uniqueness rule), company registration **atomic**
+  (a failed profile leaves no orphan user), and registration
+  succeeding while carrying a garbage token (the deliberate
+  `authentication_classes = []` design, tested so a future
+  "hardening" can't quietly break signup for logged-out users with
+  stale headers).
+- **JWT semantics, including the confusion attack**: login returns
+  the pair; access opens protected routes; wrong password and
+  garbage token both 401; refresh mints a working access token; and
+  `test_refresh_token_is_not_an_access_token` — a refresh token
+  presented as an access token is refused. Token-type confusion is a
+  real-world JWT failure mode; pinning it costs five lines.
+
+### Jobs: behaviour at the serializer boundary (`test_api_jobs.py`)
+
+Create and update both **normalize skills** (the write-time
+normalization that makes array-overlap filters exact, entry 20) and
+take the company from the token, not the payload. Blank skill
+strings are rejected rather than normalized into the data; missing
+fields report per-field; an invalid `job_type` is a 400; an invalid
+filter value is a 400 (django-filter's strictness, pinned); closed
+jobs vanish from the list but answer in detail (entry 10's
+deliberate asymmetry); filters, search, ordering and pagination
+(20-per-page) each get a behavioural proof.
+
+### Applications: the whole Phase 2–3 surface (`test_api_applications.py`)
+
+- Resume **required** on apply, wrong types rejected at the API (the
+  validator suite from entry 34 covers the unit layer; here it's the
+  HTTP contract), closed and unknown jobs refused, the duplicate
+  application refused, missing application a clean 404.
+- **Response shape as privacy**: the detail response hides the
+  storage path and exposes only `has_resume` (entry 19); the resume
+  link test asserts the URL is signed against the **public** endpoint
+  setting — presigning is offline cryptography, so the test needs no
+  LocalStack, and it pins exactly the host-in-signature fix that
+  entry 19 exists because of. No resume → 404 with its specific
+  message.
+- **Status semantics**: bad bodies parametrized with exact messages
+  — empty body → "This field is required." (entry 13's strict
+  serializer), and `"hired"` — the brief's original status name,
+  renamed away in Phase 1 — rejected as an invalid choice.
+  And the producer rule from entry 24, tested at its seam: with
+  `publish_status_changed` monkeypatched at the view, two identical
+  PATCHes produce **exactly one** call, with `old="submitted"`. The
+  on_commit mechanics inside `events.py` remain for the worker-test
+  layer; the view's only-on-change discipline is now pinned.
+
+### Status
+
+Phase 5 layers so far: unit (34), permissions (35), API behaviour
+(36) — roughly 73 tests. Still to come: worker/queue tests (the
+producer's on_commit firing, the dedupe cases of entries 25–26,
+DLQ-shaped failures), cache-behaviour tests (HIT/MISS header,
+invalidation), and the 80% coverage target, now measurable on every
+run thanks to entry 34's addopts.
+
+### Article angles
+
+- "Write the contract twice: API tests as the executable spec of your endpoints"
+- "The refresh-token-as-access-token test: five lines that close a JWT confusion hole forever"
+- "Registration is a security surface: role-locking, atomicity, and ignoring bad tokens on purpose"
+- "Presigned URLs are offline crypto: your S3 download test doesn't need S3"
+- "Test the seam, not the system: monkeypatching the publisher to prove exactly-once-on-change"
