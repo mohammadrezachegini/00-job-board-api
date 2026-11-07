@@ -1396,3 +1396,82 @@ run thanks to entry 34's addopts.
 - "Registration is a security surface: role-locking, atomicity, and ignoring bad tokens on purpose"
 - "Presigned URLs are offline crypto: your S3 download test doesn't need S3"
 - "Test the seam, not the system: monkeypatching the publisher to prove exactly-once-on-change"
+
+---
+
+## Entry 37 — 2026-11-06 — S3 and SQS integration tests with moto (commit `ee20616`)
+
+### Why moto is the right fake here
+
+Every previous layer stubbed at the code seam (monkeypatched
+publisher, LocMem cache). The AWS seams are different: their risk
+lives in *protocol* behaviour — boto3 calls, django-storages paths,
+SQS visibility semantics — that a stub would simply re-assert. moto
+(`moto[s3,sqs]` in the dev group) intercepts boto3 at the transport
+and implements the services' real semantics in-process: the code
+under test runs unmodified, against the same API shapes LocalStack
+serves in Compose, with no containers and no network. An `aws`
+fixture wires it up (mock services, bucket and queue created,
+settings endpoints pointed at the fakes, and — the essential detail
+— the `lru_cache` on `get_queue()` cleared so tests don't inherit a
+client bound to a previous test's mock).
+
+### Storage: five tests, one honest wart (`test_aws_storage.py`)
+
+- Apply-with-resume lands the file in the bucket under the
+  `resume/job-{id}/{uuid}` key scheme; **the stored object is
+  private** (no public access — downloads happen by signed URL or
+  not at all, entry 19's stance, proven); a **rejected upload stores
+  nothing** — validation runs before the storage write, an ordering
+  invariant worth pinning because a refactor could silently invert
+  it; the presigned link parses apart and is signed for the stored
+  file specifically (key, signature params).
+- And the standout: `test_duplicate_race_returns_400_but_leaves_the_file_behind`.
+  When two applies race and the loser dies on the
+  (job, candidate) unique constraint, the API correctly returns 400
+  — but the loser's resume was already saved to S3 by the serializer
+  flow and is **orphaned in the bucket**. This is a genuine finding,
+  surfaced by testing the seam, and the response is the honest one:
+  a test whose name documents the wart, characterizing current
+  behaviour until it's fixed (cleanup-on-error in the create path,
+  or a periodic bucket sweep against the applications table). It
+  joins the backlog below — discovered, not hidden.
+
+### Queue and producer: the Phase 3 guarantees, proven (`test_aws_queue.py`)
+
+- The `cloud.queue` interface round-trips through moto SQS:
+  send → queue counts (1 waiting, 0 in-flight) → receive (message
+  parsed into a `QueueMessage`, counts flip) → delete. The received
+  messages are **immutable** (the frozen dataclass raises on
+  assignment — a small contract that keeps handlers honest), and
+  `get_queue()` is one shared instance per process.
+- **The on_commit trilogy** — the strongest tests in the file:
+  `test_status_change_is_published_only_after_commit` holds a
+  transaction open and asserts the queue stays empty until commit;
+  `test_rolled_back_change_publishes_nothing` raises inside the
+  atomic block and asserts the queue stays empty *forever*;
+  `test_unchanged_status_publishes_nothing` re-pins the view's guard
+  at this layer. Together they convert entry 24's central design
+  claim — no phantom events — from argument into evidence.
+- **Outage behaviour**: with the endpoint broken, publishing is
+  logged, not raised (entry 24's log-and-continue contract), so a
+  dead queue degrades notifications without breaking status changes.
+
+### Status
+
+Phase 5 layers: unit (34), permissions (35), API (36), AWS
+integration (37) — ~86 tests. What remains untested by design of the
+sequence so far: the worker loop itself (claim/send/dedupe cases
+from entries 25–26 — the last big behavioural surface), cache
+behaviour at HTTP level (X-Cache HIT/MISS, invalidation), and the
+coverage push to 80%. NEW backlog item from this commit's own
+finding: orphaned resume file when the duplicate-application race
+rejects after the storage write.
+
+### Article angles
+
+- "Fake the protocol, not the code: when moto beats mocks for AWS seams"
+- "The test that documents a bug on purpose: characterizing the orphaned-file wart"
+- "Prove on_commit: hold the transaction open and watch the queue stay empty"
+- "Validation before storage is an ordering invariant — pin it or lose it"
+- "Your lru_cache'd client is test pollution waiting to happen: reset your seams per test"
