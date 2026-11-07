@@ -1216,3 +1216,102 @@ visible on every run.
 - "Boundary values are where validators live: exactly 5 MB, and one byte over"
 - "A test can be a docstring: pinning the None your API returns for empty skills"
 - "Banker's rounding will surprise your match scores — pin it before it pins you"
+
+---
+
+## Entry 35 — 2026-11-06 — Permission tests: the who-can-do-what matrix (commit `58c883a`)
+
+### Why this suite, why now
+
+Of everything Phase 5 could test first, the permissions layer is the
+highest-value target: authorization bugs fail *silently toward open*
+(a missing check returns 200s, not errors), and entries 10–12's
+history — three real holes found by hand, weeks after the code —
+is the receipt. This commit converts that manual audit into a
+permanent, executable specification.
+
+### Two layers, each testing what it can see
+
+```python
+# unit layer — classes in isolation, fake request = SimpleNamespace(user=...)
+def req(user): return SimpleNamespace(user=user)
+
+def test_is_verified_company(make_company, make_candidate):
+    permission = IsVerifiedCompany()
+    assert not permission.has_permission(req(AnonymousUser()), None)
+    assert permission.message == "Only company accounts can do this."
+    assert permission.has_permission(req(make_company("acme").user), None)
+```
+
+```python
+# API layer — parametrized actor × endpoint matrix
+@pytest.mark.parametrize(("who", "expected"),
+    [("anon", 401), ("sam", 403), ("initech", 403), ("acme", 201), ("globex", 201)])
+def test_only_verified_companies_post_jobs(client_for, who, expected):
+    response = client_for(who).post("/api/jobs/", NEW_JOB, format="json")
+    assert response.status_code == expected
+```
+
+- **Unit layer** drives the four classes (IsVerifiedCompany,
+  IsCandidate, IsJobOwner, IsApplicantOwner) directly with a
+  `SimpleNamespace` stand-in request — no HTTP, no database routing
+  beyond the factory fixtures — and asserts the **denial messages as
+  contract**: "Only company accounts can do this." vs "Your company
+  account is not verified." are different user-facing promises, and
+  the missing-profile company (an orphan user with role but no
+  Company row) is tested to land on the unverified branch, not a
+  crash. One test even pins that setting a message on an instance
+  doesn't mutate the class attribute — the kind of statefulness trap
+  DRF's `message` attribute invites, noticed and fenced.
+- **API layer** is a cast-and-matrix design: a `world` fixture builds
+  the standard dramatis personae (the dev-helper cast — verified
+  acme/globex, unverified initech, candidate sam), `client_for(who)`
+  hands back an APIClient authenticated as that actor, and
+  parametrized rows read like the spec they are. The 401/403 line is
+  respected — anonymous gets 401 (no credentials), wrong-role gets
+  403 (authenticated, not allowed) — and denial responses are
+  asserted for their `detail` text at HTTP level too, not just
+  codes. Coverage spans: list/detail login-only, job create,
+  owner-only update, owner-only applicants, candidate-only apply,
+  application detail and resume link restricted to applicant +
+  job owner, status changes owner-only. Every hole closed in
+  entries 10–12 now has a regression test with its name on it.
+
+### The two fixtures that keep the suite fast and hermetic
+
+```python
+@pytest.fixture(autouse=True)
+def local_cache(settings):
+    settings.CACHES = {"default": {"BACKEND": "...locmem.LocMemCache"}}
+    cache.clear()
+
+@pytest.fixture(autouse=True)
+def fast_password_hashing(settings):
+    settings.PASSWORD_HASHERS = ["...MD5PasswordHasher"]
+```
+
+Autouse `settings` overrides (pytest-django) swap the cache to
+per-test in-memory LocMem — the suite needs no running Redis, tests
+can't leak cached job lists into each other, and entry 22's cache
+behaviour gets exercised against a real cache backend API rather
+than a mock — while MD5 hashing trades test-only password strength
+for speed, so a matrix that mints a cast per test doesn't pay PBKDF2
+prices for it. Both are textbook moves, applied exactly where they
+belong: in fixtures, never in shipped settings.
+
+### Status
+
+Phase 5: harness (34) + unit tests (34) + permission matrix (35).
+Remaining on the test plan: API flows for auth/jobs/applications
+beyond permissions (validation, pagination, filters, the cached-list
+X-Cache behaviour), worker/queue tests (producer on_commit semantics
+and the dedupe cases from entries 24–26 deserve the same permanent
+proof), and the 80% coverage target.
+
+### Article angles
+
+- "Authorization fails silently toward open: test the matrix, not the happy path"
+- "Your denial messages are API contract — assert the words, not just the 403"
+- "401 vs 403 is a spec decision: unauthenticated is not unauthorized"
+- "Two fixtures that make Django suites fast: LocMem cache and a cheap hasher"
+- "The cast pattern: one world fixture, a client_for() vending machine, rows that read like a spec"
