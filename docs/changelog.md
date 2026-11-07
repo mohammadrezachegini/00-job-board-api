@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — docs: technical notes entry 36 — API behavioural tests (94f4e25)
+- 2026-11-07 — docs: update changelog [skip changelog] (1ce85b5)
 - 2026-11-06 — docs: journal — API tests (auth, jobs, applications) (b664aab)
 - 2026-11-07 — docs: update changelog [skip changelog] (0fbb7a3)
 - 2026-11-06 — API tests: registration, JWT flow, job validation/filters/ordering/pagination, application validation and status (6de9e76)
