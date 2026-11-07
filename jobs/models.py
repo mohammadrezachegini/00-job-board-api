@@ -89,8 +89,8 @@ class Job(models.Model):
 
 
 def resume_upload_path(instance, filename):
-    extentsion = Path(filename).suffix.lower()
-    return f"resume/job-{instance.job_id}/{uuid.uuid4().hex}{extentsion}"
+    extension = Path(filename).suffix.lower()
+    return f"resume/job-{instance.job_id}/{uuid.uuid4().hex}{extension}"
 
 
 class Application(models.Model):
