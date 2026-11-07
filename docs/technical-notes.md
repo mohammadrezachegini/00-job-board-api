@@ -1561,3 +1561,78 @@ static files under gunicorn, cache-metrics wiring, entry 8 hygiene).
 - "Test the rollback, not the claim: dedupe lives in transaction boundaries"
 - "Header injection is a test case: newlines in user data vs your subject line"
 - "Liveness ignoring everything is a feature — pin it before someone 'fixes' it"
+
+---
+
+## Entry 39 — 2026-11-07 — OpenAPI schema and Swagger UI that match the code (commits `a2b2ece`, `0624461`)
+
+Two commits, two distinct acts: generate the documentation, then
+refuse to let it lie.
+
+### Act one: generation (`a2b2ece`)
+
+drf-spectacular joins the stack (`DEFAULT_SCHEMA_CLASS` → its
+AutoSchema). Endpoints: `/api/schema/` for the raw OpenAPI document
+and `/api/schema/swagger-ui/` for the browsable UI — both public
+(demos and reviewers shouldn't need a token to read the docs; the
+probes set the same precedent). `SPECTACULAR_SETTINGS` carries an
+honest description with the one instruction a reader actually needs
+("get a token from /api/auth/token/ and click Authorize"),
+`COMPONENT_SPLIT_REQUEST: True` so request and response shapes get
+separate components — the setting that respects this API's
+write-only-fields design instead of merging it away. Only DRF views
+appear; the plain-Django probes stay out, correctly.
+
+### Act two: truth (`0624461`)
+
+Auto-generation gets the CRUD-shaped 80% right and the interesting
+20% wrong. Six `extend_schema` declarations fix the operations where
+inference fails:
+
+- **Registration** (both roles): 201 returns `RegisteredUser` —
+  {id, username, email, role} — not the fat registration serializer
+  with its write-only password echoed back into the docs.
+- **Applicants list**: a paginated Application list, declared as
+  such rather than whatever the action's return annotation guessed.
+- **Status action**: request is `ApplicationStatusSerializer` —
+  exactly one field, `status` — response the full Application. The
+  Phase 2 discipline (entry 13) now visible in the contract.
+- **Resume link**: 200 is `ResumeLink` {url, expires_in}; the 404
+  carries its real description, "This application has no resume."
+
+The computed fields are typed by **return annotations on the
+getters** — `get_match_score(...) -> int | None`,
+`get_has_resume(...) -> bool` — which the generator reads, so
+`match_score` documents as integer-and-nullable (entry 16's `None`
+semantics, in the contract at last) instead of the untyped blob a
+SerializerMethodField normally produces.
+
+### The schema is under test (`test_schema.py`, 8 tests)
+
+The decisive choice: documentation drift is a test failure.
+`test_schema_is_valid_and_has_no_warnings` runs the generator with
+`--validate --fail-on-warn` — any spectacular warning (an untyped
+field, an unresolvable serializer) breaks the suite, so tomorrow's
+new endpoint can't silently degrade the docs. The structural tests
+assert the contract's load-bearing shapes against the generated
+document itself: the jwtAuth security scheme is exactly
+bearer/JWT; the status request component contains *only* `status`;
+registration's 201 is the four-field user summary on both paths;
+the Application **response has no `resume` field** — entry 19's
+privacy rule, now enforced in the published schema as well as the
+API — while the request side types the upload as binary; both docs
+URLs answer 200 anonymously.
+
+### Status
+
+Suite now ~127 tests. Still open from Phase 5: the coverage number
+against the 80% promise and the README sync (a natural place to
+record the docs endpoints). Functional backlog unchanged.
+
+### Article angles
+
+- "Generated docs lie politely: the second pass that makes an OpenAPI schema true"
+- "Fail on warn: turning documentation drift into a red test"
+- "Your schema is a public surface: the resume field must not exist in it"
+- "Type your computed fields with return annotations and let the generator read them"
+- "COMPONENT_SPLIT_REQUEST: the one setting that respects write-only fields"
