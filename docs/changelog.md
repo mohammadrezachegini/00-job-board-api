@@ -2,6 +2,7 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-07 — docs: update changelog [skip changelog] (d7d8f6b)
 - 2026-11-06 — docs: technical notes entry 34 — pytest setup, test stage, unit tests (022a68d)
 - 2026-11-06 — docs: journal — pytest setup + first unit tests (Phase 5) (f6fe1fe)
 - 2026-11-07 — docs: update changelog [skip changelog] (87dd1e6)
