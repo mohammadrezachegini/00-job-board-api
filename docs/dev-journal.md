@@ -414,3 +414,14 @@ This journal is updated as new work is pushed.
   publish-exactly-once-on-change rule are all pinned at HTTP level.
   Phase 5's test pyramid now has its unit, permission and API layers.
   Technical breakdown in `docs/technical-notes.md`, entry 36.
+- 2026-11-06 (commit `ee20616`, "S3 and SQS tests with moto"): the AWS
+  seams get integration tests against moto's in-process fakes. Resume
+  uploads are proven to land in S3 privately, rejected uploads to
+  store nothing, presigned links to point at the stored file; the
+  queue does a full send/receive/delete round trip; and the event
+  producer is proven to publish only after commit — a rolled-back
+  status change publishes nothing, and a queue outage is logged, not
+  raised. One honest wart is documented by its own test: a duplicate
+  application rejected by the database race still leaves its uploaded
+  file behind in the bucket. Technical breakdown in
+  `docs/technical-notes.md`, entry 37.
