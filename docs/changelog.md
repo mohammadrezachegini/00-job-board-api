@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-07 — docs: technical notes entry 39 — OpenAPI schema truth pass (394d37d)
+- 2026-11-07 — docs: update changelog [skip changelog] (7b62b81)
 - 2026-11-07 — docs: journal — OpenAPI schema + Swagger UI (9e181a9)
 - 2026-11-07 — docs: update changelog [skip changelog] (2de64a9)
 - 2026-11-07 — Make the OpenAPI schema match the code: extend_schema on 4 operations, typed method fields, schema tests (0624461)
