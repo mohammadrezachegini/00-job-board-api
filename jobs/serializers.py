@@ -21,7 +21,7 @@ class BaseRegistrationSerializer(serializers.Serializer):
             raise serializers.ValidationError("This username is already taken.")
         return value
 
-    def validate_email(delf, value):
+    def validate_email(self, value):
         value = value.lower()
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError(

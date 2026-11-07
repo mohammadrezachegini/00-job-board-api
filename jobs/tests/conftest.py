@@ -37,18 +37,17 @@ def make_candidate(db):
 
 @pytest.fixture
 def make_job(db):
-    def _make(company, title="Junior DevOps Engineer", required_skills=None, **fields):
+    def _make(company, title="Junior DevOps Engineer", required_skills=None, location="Vancouver", **fields):
         return Job.objects.create(
             company=company,
             title=title,
             description="Build and run things.",
-            location="Vancouver",
+            location=location,
             required_skills=required_skills or [],
             **fields,
         )
 
     return _make
-
 
 @pytest.fixture
 def make_application(db):
@@ -71,3 +70,16 @@ def local_cache(settings):
 @pytest.fixture(autouse=True)
 def fast_password_hashing(settings):
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
+@pytest.fixture
+def api_as():
+    from rest_framework.test import APIClient
+
+    def _client(user=None):
+        client = APIClient()
+        if user is not None:
+            client.force_authenticate(user=user)
+        return client
+
+    return _client
