@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — Worker, email, cache and readiness tests; one-pass worker loop with a fake queue (f803c0d)
+- 2026-11-07 — docs: update changelog [skip changelog] (df70815)
 - 2026-11-06 — docs: technical notes entry 37 — moto AWS integration tests (7a07dd7)
 - 2026-11-07 — docs: update changelog [skip changelog] (3469478)
 - 2026-11-06 — docs: journal — moto S3/SQS integration tests (6edfe2a)
