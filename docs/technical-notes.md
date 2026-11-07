@@ -1117,3 +1117,102 @@ cache metrics, entry 8 serializer hygiene, match-score docstring.
 ### Article angle
 
 - "Freeze your dependencies, don't just stop them: pause-based readiness testing finds the bugs stop-tests miss"
+
+---
+
+## Entry 34 — 2026-11-06 — Phase 5 opens: pytest, a test image stage, first unit tests (commits `8f81ce0`, `31be719`)
+
+### Infrastructure that respects the production image
+
+```toml
+[dependency-groups]
+dev = ["pytest>=9.2.0", "pytest-cov>=7.1.0", "pytest-django>=4.14.0"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+addopts = "--cov --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["jobs", "cloud", "worker", "config"]
+omit = ["*/migrations/*", "*/tests/*", "config/asgi.py", "config/wsgi.py"]
+```
+
+```dockerfile
+FROM builder AS builder-test          # production + dev dependencies
+RUN uv sync --locked --no-install-project
+FROM python:3.12-slim AS base         # factored out of runtime
+FROM base AS test                     # dev venv, CMD ["pytest"] — never deployed
+FROM base AS runtime                  # unchanged production image
+```
+
+- **Dev dependencies live in uv's dependency-groups**, so the
+  production builder's `--no-dev` sync structurally cannot leak test
+  tooling into the shipped image. The test environment is a
+  *separate stage* fed by a `builder-test` sync and gated behind a
+  Compose `profiles: ["test"]` service with `target: test` — tests
+  run in a container built like production's sibling, never as an
+  afterthought inside it. The refactor of `base` out of the runtime
+  stage is the kind of small structural move that keeps a growing
+  Dockerfile honest.
+- **Coverage is on by default** (`--cov` in addopts, term-missing so
+  gaps are visible in every run, not an annual audit) and its scope
+  is a decision: app packages *including the worker and cloud seams*,
+  omitting migrations and the WSGI/ASGI shims. You measure the code
+  you wrote, not the code Django generated.
+
+### Fixtures: factories without a factory library
+
+```python
+# jobs/tests/conftest.py — factory fixtures
+@pytest.fixture
+def make_company(db):
+    def _make(username="acme", verified=True, name=None): ...
+    return _make
+# + make_candidate, make_job, make_application
+```
+
+The "factory fixtures" pattern — fixtures returning maker functions
+with happy-path defaults and per-call overrides — buys factory_boy's
+ergonomics with zero new dependencies: `make_company(verified=False)`
+is the whole vocabulary a permissions test needs. Defaults encode
+the domain's normal case (verified company, a realistic job title),
+so each test body shows only what makes it different.
+
+### The first tests pin behaviour, not implementation
+
+- **matching**: normalization (strip/lower/dedupe), exact scores —
+  and two pins with real thought behind them: *empty required skills
+  → `None`* (the semantic choice from Phase 2 that never got its
+  docstring is now documented by a test, the most executable place
+  it could live), and *halves round to even* — Python's banker's
+  rounding in `round()` discovered, understood, and pinned so a
+  future "fix" doesn't silently change scores.
+- **validators**: extension allowlist, content/extension mismatch
+  (the magic-byte check), **boundary values** — exactly 5 MB passes,
+  5 MB + 1 byte fails — and the file-rewound invariant (the `seek(0)`
+  discipline from entry 18, now enforced by test instead of memory).
+- **models**: role properties, unique email, job/application
+  defaults, the one-application-per-job constraint, ProcessedEvent's
+  unique `event_id` (entry 26's dedupe foundation, tested at the
+  layer that guarantees it), upload-path randomness + lowercased
+  extension, cascade behaviour.
+- **smoke**: `/healthz` answers; the test database starts empty —
+  the isolation assumption every other test silently stands on, made
+  explicit once.
+
+### Status
+
+Phase 5 layer 1 done: harness + unit tests (~23 tests). Next per
+the programme: API tests (auth, jobs — tonight's plan), then
+applications/permissions, worker tests, and the coverage target the
+README has promised (80%+) — the addopts make progress toward it
+visible on every run.
+
+### Article angles
+
+- "Test stages, not test containers: multi-stage Dockerfiles grow a sibling, not a wart"
+- "Factory fixtures: factory_boy's ergonomics with zero dependencies"
+- "Boundary values are where validators live: exactly 5 MB, and one byte over"
+- "A test can be a docstring: pinning the None your API returns for empty skills"
+- "Banker's rounding will surprise your match scores — pin it before it pins you"
