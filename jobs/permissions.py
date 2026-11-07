@@ -36,6 +36,7 @@ class IsJobOwner(BasePermission):
         company = getattr(request.user, "company", None)
         return company is not None and job.company_id == company.id
 
+
 class IsApplicantOwner(BasePermission):
     message = "You don't have access to this application."
 

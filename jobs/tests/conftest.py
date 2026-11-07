@@ -56,3 +56,18 @@ def make_application(db):
         return Application.objects.create(job=job, candidate=candidate, **fields)
 
     return _make
+
+
+@pytest.fixture(autouse=True)
+def local_cache(settings):
+    settings.CACHES = {
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+    }
+    from django.core.cache import cache
+
+    cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def fast_password_hashing(settings):
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
