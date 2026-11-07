@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — docs: journal — moto S3/SQS integration tests (6edfe2a)
+- 2026-11-07 — docs: update changelog [skip changelog] (de55525)
 - 2026-11-06 — S3 and SQS tests with moto: upload, privacy, presigned URL, publish on commit only, queue round trip (ee20616)
 - 2026-11-07 — docs: update changelog [skip changelog] (0a901fb)
 - 2026-11-06 — docs: technical notes entry 36 — API behavioural tests (94f4e25)
