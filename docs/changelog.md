@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — docs: technical notes entry 37 — moto AWS integration tests (7a07dd7)
+- 2026-11-07 — docs: update changelog [skip changelog] (3469478)
 - 2026-11-06 — docs: journal — moto S3/SQS integration tests (6edfe2a)
 - 2026-11-07 — docs: update changelog [skip changelog] (de55525)
 - 2026-11-06 — S3 and SQS tests with moto: upload, privacy, presigned URL, publish on commit only, queue round trip (ee20616)
