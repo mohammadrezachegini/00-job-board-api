@@ -395,3 +395,14 @@ This journal is updated as new work is pushed.
   validator and the models — including boundary cases like a resume
   of exactly 5 MB and one byte over. API tests come next. Technical
   breakdown in `docs/technical-notes.md`, entry 34.
+- 2026-11-06 (commit `58c883a`, "Permission tests"): the authorization
+  rules from Phase 2 get their proof. Fourteen tests in
+  `jobs/tests/test_permissions.py` cover the four permission classes
+  directly — including the exact wording of each denial message — and
+  then an API-level who-can-do-what matrix: a fixed cast of users
+  (anonymous, candidate, unverified company, two verified companies)
+  is run against every protected endpoint with the expected status
+  code for each. Two test-speed fixtures ride along: an in-memory
+  cache per test, and a fast password hasher so creating test users
+  stays cheap. Technical breakdown in `docs/technical-notes.md`,
+  entry 35.
