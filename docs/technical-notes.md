@@ -1475,3 +1475,89 @@ rejects after the storage write.
 - "Prove on_commit: hold the transaction open and watch the queue stay empty"
 - "Validation before storage is an ordering invariant — pin it or lose it"
 - "Your lru_cache'd client is test pollution waiting to happen: reset your seams per test"
+
+---
+
+## Entry 38 — 2026-11-06 — Worker, email, cache and readiness tests (commit `f803c0d`)
+
+Thirty-three tests close out the behavioural map. Each file takes
+one of the design-heavy entries from earlier phases and converts its
+central claim into a permanent proof.
+
+### The worker: entries 25–26, automated (`test_worker.py`, 13)
+
+The README's manual simulations (entry 27) are now code. Using
+pytest-django's `mailoutbox` (locmem email backend), the handler
+tests call `handle_status_changed` directly:
+
+- send + claim together: one email out (subject ending in the new
+  status label), `ProcessedEvent` row present;
+- **duplicate event → still one email**, one claim row, and the
+  "already processed; skipping duplicate" log line asserted — the
+  dedupe contract in full;
+- **failed send releases the claim**: the mail function is
+  monkeypatched to raise `SMTPException`; the claim is asserted
+  *absent* after the exception (rolled back with the send, exactly
+  entry 26's mechanism), then the real function is restored, the
+  redelivery succeeds, and exactly one email exists. This is the
+  subtlest correctness property in the whole project — claim lives
+  and dies with the send's transaction — and it is now a 15-line
+  test instead of a paragraph of reasoning;
+- deleted application: no email, claim *persists* (marked done —
+  entry 25's permanent-vs-transient taxonomy), log line asserted;
+- `claim_event` itself unit-tested (first claim wins, second loses).
+
+The loop tests drive `main()` against a **fake queue** — an
+in-memory stand-in for the `cloud.queue` interface whose receive
+serves prepared batches and ends the run, making the infinite loop
+a one-pass function for testing purposes (the refactor the commit
+title names). Against it: handled messages are deleted; a failed
+message is kept *and the batch continues*; a receive error waits
+5 seconds (sleep itself faked) and retries; a delete error is
+absorbed; SIGTERM/SIGINT handlers are registered and `stop()` ends
+the loop. The worker's scar tissue from entry 28 is now regression
+armor.
+
+### The supporting contracts (`test_emails.py`, `test_cache.py`, `test_health.py`)
+
+- **Emails (5)**: content assembled from the right fields;
+  first-name preferred over username; plain text **not** HTML-escaped
+  (the template's `autoescape off` verified, not assumed); and the
+  `_one_line` defence tested as an attack — newlines in the job
+  title cannot reach the subject header. Unknown status raises,
+  feeding the worker's retry/DLQ path.
+- **Cache (9)**: entry 22's contract, line by line — second request
+  is a HIT (header asserted); different queries cache separately;
+  **query-parameter order does not matter** (the sorted-params key
+  design); a new job invalidates **only after commit** (the
+  on_commit rule at HTTP level); company changes invalidate too
+  (the Company-signal subtlety); a missing version key is recreated
+  by the bump (post-flush recovery); a bump failure is logged, not
+  raised; and both outage modes degrade gracefully — cache down
+  falls back to the database, cache *write* failure still serves.
+- **Readiness (6)**: all-ok against the real checks (test DB, LocMem,
+  moto queue); database down → 503 **and the response hides the
+  error's message** (only the type name ships — asserted, closing
+  entry 28's no-internals promise); a non-critical failure stays
+  ready; **liveness ignores every dependency** even with all of them
+  broken — the probes' core semantic, pinned; the cache check
+  detects a bad read-back (a lying cache fails readiness, a merely
+  reachable one doesn't pass it); the queue check actually pings.
+
+### Status
+
+Phase 5 behavioural coverage is complete: unit (34), permissions
+(35), API (36), AWS integration (37), worker/email/cache/health
+(38) — roughly **119 tests**. Remaining Phase 5 admin: the coverage
+report against the promised 80% and the README Phase 5 sync.
+Functional backlog unchanged (my-applications, close action,
+orphaned-resume cleanup from entry 37, ProcessedEvent pruning,
+static files under gunicorn, cache-metrics wiring, entry 8 hygiene).
+
+### Article angles
+
+- "Your README's manual simulations want to be tests: automating the crash-after-send scenario"
+- "A fake that ends infinity: making a while-True worker loop testable in one pass"
+- "Test the rollback, not the claim: dedupe lives in transaction boundaries"
+- "Header injection is a test case: newlines in user data vs your subject line"
+- "Liveness ignoring everything is a feature — pin it before someone 'fixes' it"
