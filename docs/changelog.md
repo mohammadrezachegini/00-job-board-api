@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-06 — Unit tests: match score, resume validator, models; factory fixtures (31be719)
+- 2026-11-06 — docs: update changelog [skip changelog] (07c0a3f)
 - 2026-11-06 — Add pytest, pytest-django, pytest-cov; test image stage and compose test service; smoke tests (8f81ce0)
 - 2026-11-06 — docs: update changelog [skip changelog] (d6badfa)
 - 2026-11-06 — docs: technical notes entry 33 — README Phase 4, Phases 1-4 complete (304fc9e)
