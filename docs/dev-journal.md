@@ -437,3 +437,13 @@ This journal is updated as new work is pushed.
   behavioural coverage is complete; what remains is the coverage
   target and the README sync. Technical breakdown in
   `docs/technical-notes.md`, entry 38.
+- 2026-11-07 (commits `a2b2ece` + `0624461`, OpenAPI): the API now
+  documents itself. drf-spectacular generates an OpenAPI schema at
+  `/api/schema/` with a Swagger UI beside it, public like the probes.
+  A second pass makes the schema *true*: operations the generator
+  could only guess at (registration responses, the applicants list,
+  the status action, the resume link) are declared explicitly, the
+  computed fields carry real types (match score is an integer that
+  can be null), and eight schema tests fail the build if the
+  documentation drifts from the code again. Technical breakdown in
+  `docs/technical-notes.md`, entry 39.
