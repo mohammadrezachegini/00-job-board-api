@@ -447,3 +447,19 @@ This journal is updated as new work is pushed.
   can be null), and eight schema tests fail the build if the
   documentation drifts from the code again. Technical breakdown in
   `docs/technical-notes.md`, entry 39.
+- 2026-11-07 (commit `00525e7`, "Update README for Phase 5"): the
+  README catches up with Phase 5, and with it the phase closes. The
+  status line now reads Phase 5 (tests and docs) complete; the old
+  "tests are planned" section is replaced by a real Testing section:
+  203 tests, run with one command (`docker compose run --rm test`),
+  100% line coverage against the enforced 80% gate, about 6 seconds,
+  needing only PostgreSQL — Redis faked in memory, S3/SQS faked with
+  moto. A per-area table says what each suite proves, and the README
+  records that key areas were checked by breaking the code on
+  purpose and watching exactly the expected tests fail. The OpenAPI
+  endpoints and the test service are folded into the architecture
+  diagram, features, tech stack, project structure and design
+  decisions, and a few wordings are corrected to match the code
+  (cache invalidation happens on commit; the applicant-owner
+  permission is `IsApplicantOwner`). Technical breakdown in
+  `docs/technical-notes.md`, entry 40.
