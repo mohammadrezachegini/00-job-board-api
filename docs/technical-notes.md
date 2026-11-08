@@ -1636,3 +1636,98 @@ record the docs endpoints). Functional backlog unchanged.
 - "Your schema is a public surface: the resume field must not exist in it"
 - "Type your computed fields with return annotations and let the generator read them"
 - "COMPONENT_SPLIT_REQUEST: the one setting that respects write-only fields"
+
+---
+
+## Entry 40 — 2026-11-07 — README Phase 5 sync: Phase 5 closes (commit `00525e7`)
+
+A README-only commit, and the right kind of boring: no code changed,
+because the code did not need to. Entries 38 and 39 each ended with
+the same two admin items outstanding — the coverage number against
+the promised 80% and the README sync. This commit is both, and it
+closes Phase 5.
+
+### The numbers, now public
+
+- **203 tests, 100% line coverage**, about 6 seconds, one command:
+  `docker compose run --rm test`. The gate stays where it was set in
+  entry 34 — `--cov-fail-under=80` fails the run below 80% even when
+  every test passes — so the headline is not "100% was reached once"
+  but "anything under 80% is a red build from now on."
+- The count is the honest surprise of the phase: entries 34–39
+  accounted for roughly 127 tests by their own tallies, so the final
+  suite is about 60% larger than the sum of its announced parts —
+  config/settings-helper tests (`config/tests/`, now shown in the
+  project structure) and the per-area filling-in never got their
+  own commits or entries. A lesson in why a phase README should be
+  written from the final tree, not from the journal.
+- **100% with one narrow exclusion** — `if __name__ == "__main__":`
+  — stated openly in the design decisions rather than quietly
+  massaged away. That is the credible way to report a perfect
+  number: name the one line the counter does not count.
+
+### What the new Testing section actually documents
+
+- **Isolation as a feature list**: its own `test_jobboard` database,
+  a transaction rolled back per test, an in-memory cache instead of
+  Redis, moto instead of LocalStack — the suite passes with
+  LocalStack stopped and no network. This is entries 34/37/38's
+  design, finally described where a reviewer will actually read it.
+- **A per-area proof table** (models/matching/validator, permissions,
+  API, S3/SQS, worker, cache, readiness, config, API docs) — each row
+  states what the tests *prove*, not just what they cover, mirroring
+  the claim-then-proof structure of the entries themselves.
+- **Mutation-style spot checks, disclosed**: key areas were verified
+  by breaking the code on purpose — removing an owner check, sending
+  an event before commit, invalidating the cache too early, dropping
+  skill normalisation — and in each case exactly the expected tests
+  failed. That one paragraph does more for the suite's credibility
+  than the coverage number: a test that has never been seen to fail
+  is a hope, not a proof.
+
+### The sync work around the edges
+
+- Status line: "Phase 4 complete, tests planned" → "Phase 5 (tests
+  and docs) complete," with the Azure/cloud line kept as the only
+  future item. The intro now leads with the 203-test suite and the
+  OpenAPI docs next to the operations features.
+- Architecture and structure catch up with reality: `/api/schema/`
+  and the Swagger UI join the diagram and endpoint table, the `test`
+  Compose profile gets its own box, `config/tests/` and
+  `jobs/tests/` (15 modules) appear in the tree, the Dockerfile is
+  described as builder → builder-test → base → test → runtime, and
+  drf-spectacular / pytest / pytest-django / pytest-cov / moto join
+  the tech-stack table.
+- **Corrections, not just additions**: cache invalidation now reads
+  "when a job or company change is *committed*" (the pre-Phase-5
+  wording said "immediately when any job or company changes," which
+  entry 38's tests disproved); the permissions row names
+  `IsApplicantOwner`, fixing the old `IsApplicationOwner`; the
+  applicants list is marked paginated and the resume endpoint gains
+  its "404 if none." A README sync that only adds is marketing; one
+  that also corrects is documentation.
+- New design-decision bullets make the phase's philosophy explicit:
+  tests live in a dedicated container stage and never ship in the
+  production image; fakes sit at the edges (AWS, cache), never in the
+  middle; coverage is a gate, not a report; and the API docs reuse
+  the response serializers so schema and code cannot drift (entry
+  39's argument, promoted to a stated principle).
+
+### Status
+
+**Phase 5 is complete**: unit (34), permissions (35), API (36), AWS
+integration (37), worker/email/cache/health (38), OpenAPI truth
+pass (39), and now the coverage gate and README sync (40) — 203
+tests at 100% line coverage. The functional backlog carries forward
+unchanged: my-applications list, dedicated job close action,
+orphaned-resume cleanup (entry 37's documented bug), ProcessedEvent
+pruning, static files under gunicorn, cache-metrics wiring, and the
+entry 8 serializer hygiene items.
+
+### Article angles
+
+- "100% coverage, one exclusion, named in public: reporting a perfect number credibly"
+- "Break your code on purpose and publish which tests caught it"
+- "A README sync that corrects is documentation; one that only adds is marketing"
+- "Write the phase README from the final tree — the suite was 60% bigger than its own announcements"
+- "Coverage as a gate, not a report: fail-under turns a vanity metric into a contract"
