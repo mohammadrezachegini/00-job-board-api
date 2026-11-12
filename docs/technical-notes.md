@@ -1955,3 +1955,82 @@ emulator, README sync).
 - "Suppress the warning you don't own — and only that one: pytest filters matched on message, category and module"
 - "A filter without a comment rots: write the removal condition next to every suppression"
 - "Warning noise is a bug: a suite that always warns teaches everyone to ignore warnings"
+
+---
+
+## Entry 44 — 2026-11-11 — ServiceBusQueue unit tests with fake SDK objects (commit `557de36`)
+
+Seventeen tests (355 lines) for the Azure queue adapter, built on a
+hand-rolled fake of the Azure SDK: a `world` namespace the tests
+steer — send/receive/open/close errors on demand, a send or a
+connect that *hangs* until a `threading.Event` releases it. Where
+entry 42 proved Blob against Microsoft's real emulator, this layer
+proves the queue adapter's logic in-process, including the failure
+modes an emulator can't easily be made to perform — above all, a
+broker that freezes mid-handshake.
+
+### Construction and hygiene
+
+- `test_init_connects_nowhere_and_the_url_hides_the_key`: building
+  the queue opens no connection (lazy clients — construction is
+  cheap and side-effect-free), and the loggable URL contains the
+  endpoint and queue name but **not** the shared access key from
+  the connection string. Entry 41's log-safety instinct, asserted.
+- Sender and receiver are each created once and **reused**;
+  on error the handler is **discarded** (and `_discard` ignores
+  errors from `close()` itself — cleanup must never mask the real
+  exception) and the error propagates.
+
+### The deadline discipline — now on sends too
+
+Entry 41 bounded the ping; the tests reveal sends got the same
+treatment, with an extra twist of honesty:
+
+- `test_send_gives_up_after_SEND_SECONDS_and_says_it_may_still_arrive`:
+  a hung send is abandoned at its deadline, and the raised error
+  *says the message may still arrive* — because with a frozen
+  broker that's the truth: the send's outcome is unknowable, and
+  pretending otherwise would lie to the caller about duplicates.
+  At-least-once semantics, admitted in the error message.
+- `test_send_fails_fast_while_a_previous_send_is_stuck`: one send
+  in flight at a time; a second caller fails immediately instead
+  of queueing behind a corpse — the single-flight rule from the
+  ping, applied symmetrically.
+
+### Receive/settle semantics
+
+Received messages map onto `QueueMessage`; `delete()` **completes
+the message on the same receiver** that locked it (Service Bus
+settlement is receiver-bound — the `_pending` registry's reason to
+exist); a fresh receive **forgets the previous batch's lock
+tokens**, so a stale token can never complete a message whose lock
+has expired; deleting something never received raises a queue
+error rather than failing silently; a receive error discards the
+receiver for rebuild.
+
+### The frozen-broker trilogy, in one test
+
+`test_frozen_broker_ping_times_out_then_fails_fast_then_recovers`
+walks entry 41's whole lifecycle: the fake connect hangs → the
+ping raises at its deadline → a second ping fails fast (the stuck
+thread still holds the single-flight lock) → the fake is released
+and the next ping succeeds. Plus: the ping uses its own client
+with `retry_total=0` (a probe must not retry its way past its
+budget), ping errors propagate, and `get_queue` picks Service Bus
+or SQS by provider — with `ServiceBusError` folded into the shared
+`QUEUE_ERRORS` tuple, so the worker's error handling stays
+provider-blind.
+
+### Status
+
+The Azure queue's *logic* is proved; what remains is the same
+logic against the live emulator (integration run), and the Phase 6
+README sync. Suite ~230 tests. Functional backlog unchanged.
+
+### Article angles
+
+- "Fake the SDK, freeze the broker: testing failure modes an emulator can't perform"
+- "The error that admits it doesn't know: 'may still arrive' and honest at-least-once"
+- "Single-flight everything: one stuck operation should fail its successors fast"
+- "Lock tokens expire; your bookkeeping should forget them on purpose"
+- "Cleanup must never mask the real exception: discarding handlers that ignore close errors"
