@@ -2034,3 +2034,64 @@ README sync. Suite ~230 tests. Functional backlog unchanged.
 - "Single-flight everything: one stuck operation should fail its successors fast"
 - "Lock tokens expire; your bookkeeping should forget them on purpose"
 - "Cleanup must never mask the real exception: discarding handlers that ignore close errors"
+
+---
+
+## Entry 45 — 2026-11-11 — Phase 6 closed: gunicorn control socket fix + README sync (commits `3e9e230`, `9f2ca9a`)
+
+### The socket nobody asked for (`3e9e230`)
+
+A small production papercut with a clean moral. Current gunicorn
+(26+) opens a **control socket** by default — an endpoint for its
+`gunicornc` admin tool — placed in a default directory under
+`$HOME`. This image's app user was deliberately built minimal in
+Phase 4 (non-root uid 1000, no home directory), so the socket has
+nowhere to live and startup complains or fails. The fix is one line
+in `gunicorn.conf.py` — `control_socket_disable = True` — with the
+reasoning left in the comment: the process is managed by
+Docker/Kubernetes **signals**, not by `gunicornc`, so the control
+channel is unused attack-and-failure surface. The general lesson
+is worth keeping: *dependency upgrades add features that assume a
+conventional host; a hardened image is an unconventional host, and
+the reconciliation is part of the upgrade.* The Phase 4 hardening
+(no home, no shell, non-root) wasn't the bug — it was the audit
+that caught a default nobody would have chosen.
+
+### The README closes the phase (`9f2ca9a`)
+
+Following the established rhythm: the status banner now reads
+Phase 6 complete, with the honest boundary spelled out — the app
+runs locally against emulators for both clouds; **no real cloud
+resources exist yet, and creating them with Terraform is Project
+01's job**, not a gap in this one. The architecture diagram grew
+its per-cloud branches (storage and queue both drawn as a choice,
+with the DLQ story on each side — SQS redrive vs Service Bus's
+built-in dead-letter sub-queue). The "terminal checks" — the
+README's manual-verification section — were rerun and updated for
+the Azure path, so the phase's claims carry the same
+ran-it-in-the-terminal evidence standard as Phases 3–5.
+
+### Phase 6, whole
+
+One switch (`CLOUD_PROVIDER`), two clouds, zero application-code
+changes: settings branches with tested isolation (42), a queue
+adapter whose deadline and single-flight discipline is unit-proved
+against a freezable fake SDK (44), storage proved to the wire
+against Azurite including a tampered-SAS rejection (42), and a
+bounded ping that survives the vendor's missing timeout (41). The
+portability was cheap *because* Phases 3–4 paid for the seams in
+advance — which was the thesis, and now it's the result.
+
+Project 00 stands at Phases 1–6 complete, ~230 tests. The
+functional backlog remains available whenever it earns priority
+over the program's next projects: my-applications list, dedicated
+job close action, orphaned-resume cleanup (entry 37),
+ProcessedEvent pruning, serializer hygiene (entry 8), static files
+under gunicorn, and cache-metrics wiring.
+
+### Article angles
+
+- "Your hardened image vs the library's new default: reconciling gunicorn's control socket"
+- "Portability is a thesis you test at the end: what Phase 6 cost because Phase 3 paid first"
+- "Draw both clouds in the diagram: making a runtime choice visible in the README"
+- "No real cloud resources yet — and why that's a scope line, not a gap"
