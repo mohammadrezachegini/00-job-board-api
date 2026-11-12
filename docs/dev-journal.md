@@ -463,3 +463,13 @@ This journal is updated as new work is pushed.
   (cache invalidation happens on commit; the applicant-owner
   permission is `IsApplicantOwner`). Technical breakdown in
   `docs/technical-notes.md`, entry 40.
+- 2026-11-11 (commits `e5b0e5f` + `819ece6`, Phase 6 — Azure
+  portability): the app now runs on either cloud behind one switch,
+  `CLOUD_PROVIDER`. On Azure, resumes go to Blob Storage (Azurite
+  locally) and events to Service Bus (the official emulator locally,
+  with its own SQL Server sidecar), while AWS keeps S3 and SQS. The
+  emulator's queue is configured to behave like the SQS one — same
+  lock time, same redelivery limit. The Service Bus health ping got
+  special care: the Azure SDK can hang forever logging in to a frozen
+  broker, so the ping runs in a thread with a hard wait limit.
+  Technical breakdown in `docs/technical-notes.md`, entry 41.
