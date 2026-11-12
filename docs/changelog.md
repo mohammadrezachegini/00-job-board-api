@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-11 — docs: technical notes entry 41 — Azure portability, bounded Service Bus ping (89f0d32)
+- 2026-11-12 — docs: update changelog [skip changelog] (c34faa8)
 - 2026-11-11 — docs: journal — Phase 6 Azure path behind CLOUD_PROVIDER (c03d3dd)
 - 2026-11-12 — docs: update changelog [skip changelog] (06ea912)
 - 2026-11-11 — Azure path: Blob storage (Azurite) and Service Bus queue (emulator) chosen by CLOUD_PROVIDER; per-cloud settings; bounded Service Bus ping (819ece6)
