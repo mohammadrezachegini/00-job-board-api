@@ -107,6 +107,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      azurite:
+        condition: service_started
   
   
 

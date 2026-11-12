@@ -118,23 +118,48 @@ class ServiceBusQueue(Queue):
         self._client = ServiceBusClient.from_connection_string(
             connection_string, retry_total=3, try_timeout=5
         )
+        # Sending happens inside web requests: a small retry budget, so a broken broker
+        # costs the user seconds, not minutes. The worker's receiver keeps self._client.
+        self._send_client = ServiceBusClient.from_connection_string(
+            connection_string, retry_total=1, try_timeout=2
+        )
         self._send_lock = threading.Lock()
         self._ping_lock = threading.Lock()
         self._sender = None
         self._receiver = None
         self._pending = {}
 
+    SEND_SECONDS = 3
+
     def send(self, body: dict) -> str:
+        # One id for the message, created BEFORE any retry: every resend carries the same id,
+        # and the queue's duplicate detection drops the extra copies.
         message_id = str(uuid.uuid4())
         message = ServiceBusMessage(json.dumps(body), message_id=message_id)
-        with self._send_lock:
+        if not self._send_lock.acquire(timeout=1):
+            raise ServiceBusError("Previous send still running; the broker is not answering")
+        outcome = {}
+
+        def attempt():
             try:
                 if self._sender is None:
-                    self._sender = self._client.get_queue_sender(self.name)
+                    self._sender = self._send_client.get_queue_sender(self.name)
                 self._sender.send_messages(message)
-            except AzureError:
+            except Exception as exc:
+                outcome["error"] = exc
                 self._sender = self._discard(self._sender)
-                raise
+            finally:
+                self._send_lock.release()
+
+        thread = threading.Thread(target=attempt, name="servicebus-send", daemon=True)
+        thread.start()
+        thread.join(self.SEND_SECONDS)
+        if thread.is_alive():
+            raise ServiceBusError(
+                f"Send not confirmed within {self.SEND_SECONDS} s; message {message_id} may still be delivered"
+            )
+        if "error" in outcome:
+            raise outcome["error"]
         return message_id
 
     def receive(

@@ -123,3 +123,54 @@ def aws(settings):
 
     get_queue.cache_clear()
     _public_s3_client.cache_clear()
+
+@pytest.fixture
+def azure_blob(settings):
+    """Switch storage to Azure Blob (Azurite) with a fresh container for this test."""
+    import os
+    import time
+    import uuid
+    from types import SimpleNamespace
+
+    from azure.core.exceptions import AzureError
+    from azure.storage.blob import BlobServiceClient
+
+    account = os.environ["AZURE_ACCOUNT_NAME"]
+    key = os.environ["AZURE_ACCOUNT_KEY"]
+    endpoint = os.environ["AZURE_BLOB_ENDPOINT"]
+    container = f"test-{uuid.uuid4().hex[:12]}"
+    connection_string = (
+        f"DefaultEndpointsProtocol=http;AccountName={account};AccountKey={key};BlobEndpoint={endpoint};"
+    )
+
+    settings.CLOUD_PROVIDER = "azure"
+    settings.AZURE_ACCOUNT_NAME = account
+    settings.AZURE_ACCOUNT_KEY = key
+    settings.AZURE_CONTAINER = container
+    settings.AZURE_BLOB_ENDPOINT = endpoint
+    settings.AZURE_PUBLIC_BLOB_ENDPOINT = endpoint  # tests download from inside the Compose network
+    settings.AZURE_CONNECTION_STRING = connection_string
+    settings.AZURE_OVERWRITE_FILES = False
+    settings.STORAGES = {
+        **settings.STORAGES,
+        "default": {"BACKEND": "storages.backends.azure_storage.AzureStorage"},
+    }
+
+    # retry_total=0 + connection_timeout=2: each attempt fails in ~2 s, so OUR 15 s deadline decides,
+    # not the SDK's default retries (~80 s per call when Azurite is down).
+    client = BlobServiceClient.from_connection_string(
+        connection_string, retry_total=0, connection_timeout=2
+    ).get_container_client(container)
+    deadline = time.monotonic() + 15
+    while True:
+        try:
+            client.create_container()
+            break
+        except AzureError:
+            if time.monotonic() > deadline:
+                pytest.fail(f"Azurite not reachable at {endpoint}: is the azurite service running?")
+            time.sleep(0.5)
+
+    yield SimpleNamespace(container=client, name=container)
+
+    client.delete_container()
