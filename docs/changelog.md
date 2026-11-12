@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-11 — docs: journal — ServiceBusQueue unit tests (1ad9f91)
+- 2026-11-12 — docs: update changelog [skip changelog] (eb931ad)
 - 2026-11-11 — ServiceBusQueue unit tests with fake SDK objects: send/receive/delete, deadlines, single-flight, get_queue (557de36)
 - 2026-11-12 — docs: update changelog [skip changelog] (bfbe0d3)
 - 2026-11-11 — docs: technical notes entry 43 — scoped pytest warning filter for django-storages utcnow (d9a4d00)
