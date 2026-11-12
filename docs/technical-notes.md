@@ -1815,3 +1815,72 @@ which is the natural next step. Functional backlog unchanged.
 - "When the SDK has no timeout: bounding a health check with a thread and a deadline"
 - "Pre-apply your scars: the public-endpoint lesson, inherited by the second cloud for free"
 - "The emulator has a SQL Server inside: the real cost of local Azure"
+
+---
+
+## Entry 42 — 2026-11-11 — Azure storage tests against Azurite, per-cloud settings tests (commit `4f0fd0b`)
+
+Entry 41 built the Azure path; this commit proves it, and the proof
+is stronger than the S3 equivalent because it goes all the way to
+the wire.
+
+### Storage, against the real emulator (`test_azure_storage.py`, 5)
+
+The `azure_blob` fixture flips the runtime settings to Azure and
+provisions a **fresh randomly-named container per test** — isolation
+without cleanup races. The tests run against Azurite, Microsoft's
+own storage emulator (entry 41's topology), and they mirror the S3
+suite's shape on purpose: the same five behaviours, asserted twice,
+once per cloud, is the portability claim in test form.
+
+- Upload lands the blob in the container; a rejected upload stores
+  **nothing** — the validation-before-storage ordering invariant
+  from entry 37, now proven cloud-independent.
+- **Privacy**: the stored blob is not public; anonymous access fails.
+- **The SAS test goes end to end**: it parses the issued link and
+  asserts the path (account/container/key), the permission `sp=r`
+  (read-only — least privilege, enforced by construction), a `sig`
+  present, and the expiry within 10 seconds of the 300 s setting
+  (a tolerance window for generation time, honest about clocks).
+  Then it performs a real HTTP GET against Azurite and asserts
+  200, bytes **exactly equal** to the uploaded PDF, and
+  `Content-Disposition: attachment; filename="resume-{id}.pdf"`.
+  Where the S3 presign test reasoned about the signature, this one
+  watches the file come down the wire.
+- **The tamper test is the adversarial twin**: the signature is
+  replaced with `sig=AAAA` and the request must return 403 with
+  content that is *not* the resume. A download test that only ever
+  succeeds is a demo; this one proves the signature is actually
+  being checked.
+
+### Settings: branch isolation, tested (`config/tests/test_settings.py`, 8)
+
+Entry 41's central settings claim — each cloud's branch needs only
+its own variables — becomes tests:
+
+- **azure starts without any AWS variable** and **aws starts
+  without any Azure variable**: the provider branches are
+  self-sufficient, which is exactly the property that lets a
+  deployment declare only the cloud it runs on.
+- **azure fails fast when its own variable is missing**: the other
+  side of the same coin — permissiveness between clouds, strictness
+  within one.
+- Plus unit tests for the typed env helpers (entry 30's `env` /
+  `env_bool` / `env_list`): missing *or empty* required raises, and
+  optional settings fall back to their default in both cases.
+
+### Status
+
+Phase 6's storage side is now proved. Remaining proof on the Azure
+path: the Service Bus side of the queue (entry 41's remaining item
+— the behavioural suite against the Service Bus queue, ideally
+against the emulator) and a README sync for Phase 6. Suite ~213
+tests. Functional backlog unchanged.
+
+### Article angles
+
+- "Prove both clouds the same way: mirroring your storage suite across providers"
+- "A download test that only succeeds is a demo — add the tampered-link test"
+- "Read-only SAS with a tolerance-window expiry: asserting signatures honestly"
+- "Branch isolation: your second cloud must start with none of the first cloud's variables"
+- "One fixture, one container per test: isolation without cleanup races"
