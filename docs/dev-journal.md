@@ -482,3 +482,13 @@ This journal is updated as new work is pushed.
   of the other's variables set — and fails fast when one of its own
   is missing. Technical breakdown in `docs/technical-notes.md`,
   entry 42.
+- 2026-11-11 (commit `9c7d2d0`, follow-up to the Azure tests): the
+  test run is quiet again. The new Azurite tests surfaced a
+  deprecation warning that comes from inside django-storages — its
+  Azure backend still calls the old `datetime.utcnow()` that
+  Python 3.12 warns about. It is library code, not ours, so instead
+  of fixing it the suite now hides exactly that one warning from
+  exactly that one module in `pyproject.toml`, with a comment
+  saying to remove the filter once django-storages fixes it
+  upstream. Every other warning still shows. Technical breakdown
+  in `docs/technical-notes.md`, entry 43.
