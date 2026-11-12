@@ -1731,3 +1731,87 @@ entry 8 serializer hygiene items.
 - "A README sync that corrects is documentation; one that only adds is marketing"
 - "Write the phase README from the final tree — the suite was 60% bigger than its own announcements"
 - "Coverage as a gate, not a report: fail-under turns a vanity metric into a contract"
+
+---
+
+## Entry 41 — 2026-11-11 — Phase 6: the Azure path behind `CLOUD_PROVIDER` (commits `e5b0e5f`, `819ece6`)
+
+Phase 3's `cloud/` package bet pays out: because storage and queue
+were already behind project-owned seams (django-storages for files,
+the `Queue` ABC for messages), a second cloud is mostly *settings
+and one new class* — application code doesn't learn the word Azure.
+
+### The switch (settings)
+
+`CLOUD_PROVIDER` env (default `aws`, normalized, anything else is
+`ImproperlyConfigured` at boot — entry 3's fail-fast, applied to
+portability). One if/else defines each cloud's settings *inside its
+own branch*, so the AWS-required env vars aren't demanded when Azure
+is selected and vice versa; each branch ends in the same
+`DEFAULT_STORAGE_BACKEND` name, S3Storage or AzureStorage, consumed
+by the existing `STORAGES` dict. The Azure branch mirrors the AWS
+side's hard-won details rather than reinventing them: a **public
+blob endpoint** separate from the internal one (entry 19's
+host-in-signature lesson, pre-applied), `AZURE_OVERWRITE_FILES =
+False` (uuid keys stay collision-safe), and the connection string
+*assembled* from endpoint/account/key parts so a custom blob
+endpoint — Azurite — slots in without forking config.
+
+### The queue: ServiceBusQueue (peek-lock ≈ visibility timeout)
+
+`ServiceBusQueue` implements the same ABC against Azure Service Bus
+in **peek-lock** mode, the semantic twin of SQS: receive locks
+(≈ visibility timeout), `delete()` completes the message, failure
+abandons it for redelivery, and the emulator queue config
+(`servicebus/Config.json`, commit `e5b0e5f`) mirrors the SQS queue's
+numbers — lock duration and max delivery count 3 feeding a
+dead-letter queue, so both clouds poison-message the same way.
+Differences the adapter absorbs: Service Bus settles using the
+*received message object*, not a receipt handle, so a `_pending`
+registry maps ids to locked messages; SDK clients are **not
+thread-safe**, so sends serialize under a lock (the API's gthread
+workers made this a real requirement, not trivia) while the
+single-threaded worker receives bare; senders are lazily created
+and *discarded on AzureError* so a poisoned connection is rebuilt
+rather than reused; and the loggable `url` is built from endpoint +
+queue name only — **no key material**, same instinct as the log
+hygiene entries.
+
+Local topology (profile `azure`): Azurite for Blob, the Service Bus
+emulator 2.0.1 with its mandatory SQL Server 2022 sidecar (memory
+capped at 2 GB — the emulator's appetite is real), secrets in a
+dedicated `.env.servicebus` like LocalStack's before it, everything
+loopback-bound.
+
+### The bounded ping — the entry's real lesson
+
+`readyz` calls the queue's `ping()`, and Phase 4 established that a
+health check must never hang. The Azure SDK offers `try_timeout`
+for operations — but **not for the AMQP login (SASL) step**: a
+frozen broker hangs the handshake indefinitely. So the ping runs
+its attempt (fresh client, `retry_total=0`, receiver attach =
+connect + login + attach) in a **daemon thread joined with a hard
+wait**; on timeout it raises, abandoning the stuck thread. A
+non-blocking ping lock makes concurrent pings fail fast ("previous
+ping still running") instead of stacking threads against a dead
+broker — the failure mode is bounded in time *and* in thread count.
+This is entry 28's rule surviving contact with a second vendor:
+every dependency call inside a probe carries a budget, and when
+the vendor doesn't sell you one, you build it from a thread and a
+deadline.
+
+### Status
+
+AWS remains the default and the tested path (moto suites);
+settings tests live under `config/tests`. Open on this phase:
+running the full behavioural suite against the Azure provider
+(the seams promise it should pass — the proof is a CI/profile run),
+which is the natural next step. Functional backlog unchanged.
+
+### Article angles
+
+- "One switch, two clouds: what a storage/queue seam actually buys you"
+- "Peek-lock is visibility timeout with a different accent: porting SQS semantics to Service Bus"
+- "When the SDK has no timeout: bounding a health check with a thread and a deadline"
+- "Pre-apply your scars: the public-endpoint lesson, inherited by the second cloud for free"
+- "The emulator has a SQL Server inside: the real cost of local Azure"
