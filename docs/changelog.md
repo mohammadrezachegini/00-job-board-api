@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-11 — Update README and terminal checks for Phase 6 (9f2ca9a)
+- 2026-11-12 — docs: update changelog [skip changelog] (345950e)
 - 2026-11-11 — Disable gunicorn's control socket (no home dir for the app user; process managed by signals) (3e9e230)
 - 2026-11-12 — docs: update changelog [skip changelog] (69b608a)
 - 2026-11-11 — docs: technical notes entry 44 — ServiceBusQueue unit tests (c116f47)
