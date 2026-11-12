@@ -473,3 +473,12 @@ This journal is updated as new work is pushed.
   special care: the Azure SDK can hang forever logging in to a frozen
   broker, so the ping runs in a thread with a hard wait limit.
   Technical breakdown in `docs/technical-notes.md`, entry 41.
+- 2026-11-11 (commit `4f0fd0b`, Phase 6 — Azure tests): the Azure
+  path gets its proof. Against real Azurite, the resume lands in
+  Blob Storage, stays private, downloads through a read-only SAS
+  link whose bytes match exactly, and a tampered link is refused
+  with 403; a rejected upload still stores nothing on this cloud
+  too. Beside it, settings tests prove each cloud starts with none
+  of the other's variables set — and fails fast when one of its own
+  is missing. Technical breakdown in `docs/technical-notes.md`,
+  entry 42.
