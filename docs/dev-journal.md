@@ -492,3 +492,12 @@ This journal is updated as new work is pushed.
   saying to remove the filter once django-storages fixes it
   upstream. Every other warning still shows. Technical breakdown
   in `docs/technical-notes.md`, entry 43.
+- 2026-11-11 (commit `557de36`, Phase 6 — Service Bus queue tests):
+  the Azure queue adapter gets 17 unit tests against hand-built
+  fake SDK objects. They pin the lazy connection, the key-free log
+  URL, sender/receiver reuse and discard-on-error, the receive →
+  complete-on-the-same-receiver flow, and the deadline behaviour:
+  sends give up after their limit with an error that honestly says
+  the message may still arrive, and a ping against a frozen broker
+  times out, fails fast while stuck, then recovers. Technical
+  breakdown in `docs/technical-notes.md`, entry 44.
