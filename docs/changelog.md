@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-11 — docs: technical notes entry 42 — Azurite storage tests, per-cloud settings tests (19b79c4)
+- 2026-11-12 — docs: update changelog [skip changelog] (41f0541)
 - 2026-11-11 — docs: journal — Azure storage tests against Azurite (e7437c1)
 - 2026-11-12 — docs: update changelog [skip changelog] (48d2ba1)
 - 2026-11-11 — Azure storage tests against Azurite (upload, privacy, SAS download, tampered link); per-cloud settings tests (4f0fd0b)
