@@ -2,6 +2,9 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-11 — Azure path: Blob storage (Azurite) and Service Bus queue (emulator) chosen by CLOUD_PROVIDER; per-cloud settings; bounded Service Bus ping (819ece6)
+- 2026-11-11 — Add Service Bus emulator + SQL Server in Compose (profile azure); queue mirrors SQS lock and redrive settings (e5b0e5f)
+- 2026-11-08 — docs: update changelog [skip changelog] (7b1f815)
 - 2026-11-07 — docs: technical notes entry 40 — README Phase 5 sync, Phase 5 complete (6de38ac)
 - 2026-11-08 — docs: update changelog [skip changelog] (f1522bf)
 - 2026-11-07 — docs: journal — README Phase 5 sync, Phase 5 complete (70917ca)
