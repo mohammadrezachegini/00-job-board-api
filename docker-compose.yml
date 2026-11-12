@@ -71,7 +71,31 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+  
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck"]
+    ports:
+      - "127.0.0.1:10000:10000"
 
+  servicebus-sql:
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+    profiles: ["azure"]
+    env_file: .env.servicebus
+    environment:
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+
+  servicebus:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.1
+    profiles: ["azure"]
+    env_file: .env.servicebus
+    environment:
+      SQL_SERVER: servicebus-sql
+    volumes:
+      - ./servicebus/Config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    depends_on:
+      - servicebus-sql
+    restart: unless-stopped
   test:
     build:
       context: .
