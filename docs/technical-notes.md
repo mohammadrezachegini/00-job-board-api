@@ -1884,3 +1884,74 @@ tests. Functional backlog unchanged.
 - "Read-only SAS with a tolerance-window expiry: asserting signatures honestly"
 - "Branch isolation: your second cloud must start with none of the first cloud's variables"
 - "One fixture, one container per test: isolation without cleanup races"
+
+---
+
+## Entry 43 — 2026-11-11 — One warning, one module: a scoped pytest filter for django-storages' `utcnow` (commit `9c7d2d0`)
+
+A five-line follow-up to entry 42, and the lines are all in
+`pyproject.toml` — no application code changed. Running the new
+Azurite suite exposed warning noise with a specific source, and
+this commit is about suppressing it *surgically* instead of
+broadly.
+
+### The problem: somebody else's deprecation
+
+django-storages' `AzureStorage` backend calls
+`datetime.datetime.utcnow()` internally — the naive-UTC helper
+deprecated in Python 3.12 (timezone-aware code is expected to use
+`datetime.now(timezone.utc)`). Entry 42's SAS-generation paths
+exercise that backend, so the test run now prints a
+`DeprecationWarning` the project did not cause and cannot fix:
+the call site is inside the installed library.
+
+Leaving it is not harmless. A suite that always prints warnings
+trains everyone to ignore warnings — including the first one that
+is actually yours — and it blocks ever running pytest with
+warnings-as-errors.
+
+### The fix: pytest `filterwarnings`, matched on three axes
+
+```toml
+filterwarnings = [
+    "ignore:datetime.datetime.utcnow:DeprecationWarning:storages.backends.azure_storage",
+]
+```
+
+A pytest warning filter is `action:message:category:module:line`,
+and this one pins every field it is given:
+
+- **action `ignore`** — drop only matches.
+- **message** — the filter matches the warning text from the
+  start, so this is specifically the `utcnow` deprecation, not
+  any warning the module might emit in future.
+- **category `DeprecationWarning`** — a different warning class
+  from the same module still surfaces.
+- **module `storages.backends.azure_storage`** — the same
+  deprecation raised by the project's own code (or any other
+  library) still surfaces. That is the whole point: the filter
+  forgives the library's known issue without giving the project's
+  own code a pass.
+
+### The comment is part of the change
+
+Two comment lines sit above the filter recording *why* it exists
+("library code, not ours") and its removal condition ("remove
+when django-storages fixes it"). A bare unexplained ignore rots:
+nobody can later tell whether it is still needed. A filter with
+an expiry condition written next to it can be deleted with
+confidence the day the upstream fix lands — and in the meantime
+the suite output stays clean enough that a new warning is
+visible the first time it appears.
+
+### Status
+
+Suite output clean again; no behaviour change. Remaining Phase 6
+proof unchanged from entry 42 (Service Bus queue against the
+emulator, README sync).
+
+### Article angles
+
+- "Suppress the warning you don't own — and only that one: pytest filters matched on message, category and module"
+- "A filter without a comment rots: write the removal condition next to every suppression"
+- "Warning noise is a bug: a suite that always warns teaches everyone to ignore warnings"
