@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-11 — docs: technical notes entry 44 — ServiceBusQueue unit tests (c116f47)
+- 2026-11-12 — docs: update changelog [skip changelog] (ae539c6)
 - 2026-11-11 — docs: journal — ServiceBusQueue unit tests (1ad9f91)
 - 2026-11-12 — docs: update changelog [skip changelog] (eb931ad)
 - 2026-11-11 — ServiceBusQueue unit tests with fake SDK objects: send/receive/delete, deadlines, single-flight, get_queue (557de36)
