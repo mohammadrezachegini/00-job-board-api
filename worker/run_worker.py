@@ -9,7 +9,7 @@ django.setup()
 
 import time  # noqa: E402
 
-from botocore.exceptions import BotoCoreError, ClientError  # noqa: E402
+from cloud.queue import QUEUE_ERRORS  # noqa: E402
 
 from django.db import IntegrityError, close_old_connections, transaction  # noqa: E402
 
@@ -49,7 +49,7 @@ def main():
         close_old_connections()
         try:
             messages = queue.receive()
-        except (BotoCoreError, ClientError):
+        except QUEUE_ERRORS:
             logger.exception("Could not receive messages; retrying in 5 s")
             time.sleep(5)
             continue
@@ -65,7 +65,7 @@ def main():
                 continue
             try:
                 queue.delete(message)
-            except (BotoCoreError, ClientError):
+            except QUEUE_ERRORS:
                 logger.exception(
                     "Could not delete message %s; it will be redelivered", message.id,
                     extra={"message_id": message.id},

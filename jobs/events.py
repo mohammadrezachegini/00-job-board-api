@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from botocore.exceptions import BotoCoreError, ClientError
+from cloud.queue import QUEUE_ERRORS
 from django.db import transaction
 
 from cloud.queue import get_queue
@@ -35,7 +35,7 @@ def publish_status_changed(application, old_status):
                     "message_id": message_id,
                 },
             )
-        except (BotoCoreError, ClientError):
+        except QUEUE_ERRORS:
             logger.exception(
                 "Could not queue %s for application %s",
                 STATUS_CHANGED,

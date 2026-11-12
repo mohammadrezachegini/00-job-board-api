@@ -30,18 +30,51 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
-AWS_REGION = env("AWS_REGION")
-AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME")
-AWS_S3_REGION_NAME = AWS_REGION
-AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", "") or None
-AWS_S3_PUBLIC_ENDPOINT_URL = env("AWS_S3_PUBLIC_ENDPOINT_URL", "") or AWS_S3_ENDPOINT_URL
-AWS_DEFAULT_ACL = None
-AWS_S3_FILE_OVERWRITE = False
-AWS_QUERYSTRING_AUTH = True
+CLOUD_PROVIDER = env("CLOUD_PROVIDER", "aws").strip().lower()
+if CLOUD_PROVIDER not in ("aws", "azure"):
+    raise ImproperlyConfigured(f"CLOUD_PROVIDER must be 'aws' or 'azure', not {CLOUD_PROVIDER!r}")
 RESUME_URL_EXPIRE_SECONDS = 300
 JOB_LIST_CACHE_SECONDS = 60
-AWS_SQS_ENDPOINT_URL = env("AWS_SQS_ENDPOINT_URL", "") or None
-SQS_QUEUE_NAME = env("SQS_QUEUE_NAME")
+
+if CLOUD_PROVIDER == "aws":
+    AWS_REGION = env("AWS_REGION")
+    # Queue: SQS
+    AWS_SQS_ENDPOINT_URL = env("AWS_SQS_ENDPOINT_URL", "") or None
+    SQS_QUEUE_NAME = env("SQS_QUEUE_NAME")
+    # Storage: S3
+    AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_REGION_NAME = AWS_REGION
+    AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", "") or None
+    AWS_S3_PUBLIC_ENDPOINT_URL = (
+        env("AWS_S3_PUBLIC_ENDPOINT_URL", "") or AWS_S3_ENDPOINT_URL
+    )
+    AWS_DEFAULT_ACL = None
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_QUERYSTRING_AUTH = True
+    DEFAULT_STORAGE_BACKEND = "storages.backends.s3.S3Storage"
+else:
+    # Queue: Service Bus
+    SERVICE_BUS_CONNECTION_STRING = env("SERVICE_BUS_CONNECTION_STRING")
+    SERVICE_BUS_QUEUE_NAME = env("SERVICE_BUS_QUEUE_NAME")
+    # Storage: Blob
+    AZURE_ACCOUNT_NAME = env("AZURE_ACCOUNT_NAME")
+    AZURE_ACCOUNT_KEY = env("AZURE_ACCOUNT_KEY")
+    AZURE_CONTAINER = env("AZURE_CONTAINER")
+    AZURE_BLOB_ENDPOINT = (
+        env("AZURE_BLOB_ENDPOINT", "")
+        or f"https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net"
+    )
+    AZURE_PUBLIC_BLOB_ENDPOINT = (
+        env("AZURE_PUBLIC_BLOB_ENDPOINT", "") or AZURE_BLOB_ENDPOINT
+    )
+    AZURE_CONNECTION_STRING = (
+        f"DefaultEndpointsProtocol={AZURE_BLOB_ENDPOINT.split('://')[0]};"
+        f"AccountName={AZURE_ACCOUNT_NAME};AccountKey={AZURE_ACCOUNT_KEY};"
+        f"BlobEndpoint={AZURE_BLOB_ENDPOINT};"
+    )
+    AZURE_OVERWRITE_FILES = False
+    DEFAULT_STORAGE_BACKEND = "storages.backends.azure_storage.AzureStorage"
+
 EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Job Board <no-reply@jobboard.test>")
 # Application definition
@@ -186,7 +219,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 STORAGES = {
-    "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+    "default": {"BACKEND": DEFAULT_STORAGE_BACKEND},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 
@@ -216,6 +249,7 @@ LOGGING = {
         "django": {"handlers": ["stdout"], "level": LOG_LEVEL, "propagate": False},
         "django.server": {"handlers": ["stdout"], "level": "INFO", "propagate": False},
         "botocore": {"level": "WARNING"},
+        "azure": {"level": "WARNING"},
         "urllib3": {"level": "WARNING"},
     },
 }

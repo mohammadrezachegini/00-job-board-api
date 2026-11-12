@@ -3,7 +3,7 @@ name = "00-job-board-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "azure-servicebus>=7.12",
+    "azure-servicebus>=7.15",
     "django>=5.2,<5.3",
     "django-filter>=26.2",
     "django-prometheus>=2.5",
