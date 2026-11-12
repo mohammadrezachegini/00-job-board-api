@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-11 — docs: journal — Azure storage tests against Azurite (e7437c1)
+- 2026-11-12 — docs: update changelog [skip changelog] (48d2ba1)
 - 2026-11-11 — Azure storage tests against Azurite (upload, privacy, SAS download, tampered link); per-cloud settings tests (4f0fd0b)
 - 2026-11-12 — docs: update changelog [skip changelog] (bd3f18d)
 - 2026-11-11 — docs: technical notes entry 41 — Azure portability, bounded Service Bus ping (89f0d32)
