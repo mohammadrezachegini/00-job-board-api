@@ -501,3 +501,12 @@ This journal is updated as new work is pushed.
   the message may still arrive, and a ping against a frozen broker
   times out, fails fast while stuck, then recovers. Technical
   breakdown in `docs/technical-notes.md`, entry 44.
+- 2026-11-11 (commits `3e9e230` + `9f2ca9a`, Phase 6 closed): two
+  finishing touches. A newer gunicorn tried to open its control
+  socket in the app user's home directory — which doesn't exist,
+  because the container user was deliberately made minimal — so the
+  socket is now disabled in `gunicorn.conf.py` (the process is
+  managed by Docker/Kubernetes signals anyway). The README then
+  closes Phase 6: status banner, both clouds in the architecture
+  diagram, and the terminal checks updated with the Azure runs.
+  Technical breakdown in `docs/technical-notes.md`, entry 45.
