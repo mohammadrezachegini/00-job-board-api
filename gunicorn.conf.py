@@ -34,3 +34,7 @@ logconfig_dict = {
         "gunicorn.access": {"handlers": ["stdout"], "level": "INFO", "propagate": False},
     },
 }
+# gunicorn 26+ opens a control socket (for the gunicornc tool) in a default folder under $HOME.
+# Our "app" user has no home folder, and the process is managed by Docker/Kubernetes signals,
+# not gunicornc, so the socket is turned off.
+control_socket_disable = True
