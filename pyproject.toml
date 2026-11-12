@@ -28,6 +28,11 @@ dev = [
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py"]
 addopts = "--cov --cov-report=term-missing --cov-fail-under=80"
+# django-storages' AzureStorage calls datetime.utcnow() (deprecated in Python 3.12). Library code, not ours:
+# hide only this message from only that module, so any other warning still shows. Remove when django-storages fixes it.
+filterwarnings = [
+    "ignore:datetime.datetime.utcnow:DeprecationWarning:storages.backends.azure_storage",
+]
 
 [tool.coverage.run]
 source = ["jobs", "cloud", "worker", "config"]
