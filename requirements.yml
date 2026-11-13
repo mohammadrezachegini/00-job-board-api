@@ -1,0 +1,7 @@
+---
+# Ansible roles this project depends on. Install with:  ansible-galaxy role install -r requirements.yml
+roles:
+  - name: dev-toolchain
+    src: https://github.com/mohammadrezachegini/ansible-role-dev-toolchain.git
+    scm: git
+    version: v0.1.0

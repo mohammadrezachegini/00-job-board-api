@@ -1,0 +1,20 @@
+---
+# Readies a machine for this project (Ubuntu). Run from the repo root:
+#   ansible-galaxy role install -r requirements.yml
+#   ansible-playbook bootstrap.yml -K
+- name: Install the Job Board API's local toolchain
+  hosts: localhost
+  connection: local
+  roles:
+    - role: dev-toolchain
+      vars:
+        toolchain_tools:
+          - python3.12
+          - docker
+          - postgresql-client
+          - redis-cli
+          - awscli
+          - localstack
+          - awslocal
+          - azurite
+          - pre-commit

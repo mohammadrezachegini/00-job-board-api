@@ -26,3 +26,4 @@ media/
 .DS_Store
 !.env.localstack.example
 !.env.servicebus.example
+roles/
