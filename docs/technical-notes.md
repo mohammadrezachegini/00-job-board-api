@@ -2208,3 +2208,200 @@ aimed at more than the machine under the author's own desk.
 - "Downloaded, not vendored: why roles/ is git-ignored, like a virtualenv"
 - "The interpreter is part of the config: python3-apt, /usr/bin/python3, and modules that fail in a venv"
 - "A tool list as a project map: reading Phases 3-6 back out of nine package names"
+
+---
+
+## Entry 47 — 2026-11-12 — One-command bootstrap: dev-toolchain v0.2, `scripts/bootstrap.sh`, and a fresh-machine test image (commits `87b1826`, `d990b98`, `568be46`)
+
+Entry 46 ended with two commands:
+
+```bash
+ansible-galaxy role install -r requirements.yml
+ansible-playbook bootstrap.yml -K
+```
+
+— and a quiet assumption: that Ansible already exists on the
+machine. On a genuinely fresh Ubuntu install it does not, and
+neither does anything Ansible itself needs. These three commits
+close the chicken-and-egg gap: the two commands become one,
+`./scripts/bootstrap.sh`, and the role gets a verify step.
+
+### The pin bumps first: v0.2.0 (verify step), then v0.2.1
+
+In *this* repository, commits `87b1826` and `568be46` are each a
+single line in `requirements.yml` — the dev-toolchain pin moving
+`v0.1.0` → `v0.2.0` → `v0.2.1`. The substance lives in the role's
+own repository, the same split entry 46 described: this repo
+declares the version, the role carries the implementation.
+`87b1826`'s message names v0.2.0's headline — a **verify step**:
+the toolchain no longer just installs, it can check its own work.
+That is a real change in what a bootstrap owes you. An installer
+that exits 0 proves it ran; a verify step proves the machine is
+actually in the state the project needs, and it gives a second
+run something stronger to report than "nothing changed." The
+script below already anticipates running it on its own — its
+header documents that extra arguments pass straight through to
+`ansible-playbook`, "e.g. `--tags verify`".
+
+### Anatomy of `bootstrap.sh` (`d990b98`)
+
+The script is ~40 lines of Bash under `set -euo pipefail`, and
+every line is there to make the one command safe on a machine
+that has nothing:
+
+```bash
+cd "$(dirname "$0")/.."                   # the repo root, where ansible.cfg and bootstrap.yml live
+export PATH="$HOME/.local/bin:$PATH"      # uv and ansible-core install here
+```
+
+Run-from-anywhere matters for a bootstrap: its whole audience is
+someone who just cloned the repo and is standing in an arbitrary
+directory. Three steps follow, each guarded so the script
+"installs only what's missing" and is safe to run again:
+
+1. **Ansible's own prerequisites, checked with `dpkg -s`.** curl
+   (the uv installer's transport), git (`ansible-galaxy` clones
+   the role), and python3-apt (the binding the role's `apt`
+   module needs — the interpreter lesson from entry 46, arriving
+   now as a package the *script* must guarantee). Missing names
+   are collected into an array and installed in one
+   `apt-get update` + `install`, only if the array is non-empty.
+2. **uv, pinned, then ansible-core as a uv tool.**
+   `UV_VERSION="0.13.0"`, with the comment doing the documenting:
+   "same uv as the Dockerfile and the dev-toolchain role." One
+   version, three places — the container build, the role, and now
+   the bootstrapper agree on the tool that installs everything
+   else. ansible-core itself is deliberately *not* pinned beyond
+   `>=2.17` and is installed with `uv tool install` — into
+   `~/.local/bin`, not the system Python, so the bootstrap never
+   fights Ubuntu's package manager for the interpreter (and step
+   1's python3-apt pin in the inventory is what Ansible's modules
+   actually run under).
+3. **The pinned role, then the playbook.**
+   `ansible-galaxy role install -r requirements.yml`, then
+   `ansible-playbook bootstrap.yml "${ask[@]}" "$@"`. The `ask`
+   array is the become-password decision — empty when sudo is
+   passwordless, `--ask-become-pass` otherwise — and `"$@"` is
+   the pass-through that makes `--tags verify` work. Entry 48 is
+   the story of how that probe lied and got fixed.
+
+Note what the script does *not* do: no tool installation of its
+own beyond Ansible's runway. The moment Ansible exists, Ansible
+takes over — the script is a pre-Ansible shim, and it stays
+small precisely because everything past step 3 is the role's
+job, declared in entry 46's playbook.
+
+### A fresh machine, on demand
+
+`d990b98` also adds `scripts/fresh-machine-test/Dockerfile` —
+the test fixture for the claim "works on a fresh machine":
+
+```dockerfile
+FROM ubuntu:26.04
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends sudo \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --create-home --shell /bin/bash dev \
+ && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev \
+ && chmod 0440 /etc/sudoers.d/dev
+USER dev
+WORKDIR /home/dev
+```
+
+Bare Ubuntu, plus exactly the two things a real new laptop has
+and a stock container lacks: `sudo` itself and a normal user
+who can use it (here passwordless, with the sudoers drop-in at
+the customary `0440`). Everything else — curl, git, uv, Ansible,
+every toolchain tool — is absent by construction, so a green run
+inside this image is evidence about a machine the author has
+never touched, not about the author's own well-worn laptop.
+That is the same instinct as Phase 5's "break the code on
+purpose" tests, applied to setup: *a bootstrap you only ever run
+on a prepared machine is an untested bootstrap.* One honest
+boundary: the fixture's user is NOPASSWD, while most real
+machines have password sudo — and that gap is exactly where the
+next entry's bug was hiding.
+
+### Article angles
+
+- "The two commands assumed the tool they install: closing the bootstrap chicken-and-egg"
+- "Install is a claim, verify is evidence: why the role grew a verify step at v0.2.0"
+- "One uv, three places: pinning the installer across Dockerfile, role, and bootstrap script"
+- "A fresh machine as a test fixture: 10 lines of Dockerfile as the control group for setup"
+- "The shim stays small: everything a bootstrap script should refuse to do itself"
+
+---
+
+## Entry 48 — 2026-11-13 — The password sudo remembered: `bootstrap.sh`'s probe learns `-k` (commits `2b4c9e1`, `9ea7e29`)
+
+Two commits, one of them a one-line pin bump (`2b4c9e1`:
+dev-toolchain `v0.2.1` → `v0.2.2` in `requirements.yml`, the
+usual deliberate-version discipline) and one a small fix with a
+large lesson. This is the bug entry 47's fresh-machine fixture
+could not catch, because its test user is NOPASSWD — the bug
+only exists on machines where sudo has a password *and a memory*.
+
+### The bug: a probe that shares the user's terminal
+
+`bootstrap.sh` must decide, before launching Ansible, whether
+to pass `--ask-become-pass`. Its original probe:
+
+```bash
+if sudo -n true 2>/dev/null; then ask=(); else ask=(--ask-become-pass); fi
+```
+
+`sudo -n` is non-interactive sudo: succeed if the command may
+run without a password *right now*. The subtlety is why that
+"right now" can be true: sudo caches credentials per terminal
+for a timeout window (15 minutes by default) after any
+successful use. Run any `sudo` command in your terminal — and
+someone setting up a machine has usually just run several —
+and the probe says "passwordless," the script omits the flag,
+and Ansible starts. But Ansible's become does not inherit the
+interactive terminal's credential ticket: it invokes sudo in
+its own context, with no terminal to prompt on. Its sudo asks
+for a password nobody can type, and the playbook fails — on a
+machine where the probe had every reason to look correct.
+
+The script's new comment states it in two lines:
+
+```bash
+# -k: ignore a password cached in THIS terminal; Ansible runs sudo without a terminal, so only
+# NOPASSWD sudo counts. (sudo -n alone said "yes" right after any sudo use, then Ansible failed.)
+```
+
+### The fix: `sudo -k -n true`
+
+```bash
+if sudo -k -n true 2>/dev/null; then ask=(); else ask=(--ask-become-pass); fi
+```
+
+`-k` invalidates the cached timestamp for this invocation —
+the probe now asks the question it actually meant: *can sudo
+run with no password and no remembered password?* Only a true
+NOPASSWD configuration answers yes; everyone else gets
+`--ask-become-pass`, Ansible prompts once up front, and the run
+proceeds. One flag character, and the probe stops measuring
+the operator's recent terminal history and starts measuring
+the property the consumer (Ansible) will actually experience.
+
+### The general lesson
+
+**A probe must reproduce the conditions of its consumer, not
+of its caller.** The original check was not sloppy — `sudo -n`
+is the textbook passwordless test — it was *environmentally*
+wrong: it ran inside a session whose state (a warm credential
+cache, tied to that TTY) the real consumer would never share.
+Stateful probes lie quietly exactly when a human has been
+actively using the system, which is precisely when setup
+scripts run. The fresh-machine image in entry 47 brackets the
+problem from the other side: NOPASSWD there, password-with-cache
+here — "fresh" and "used" machines fail differently, and a
+bootstrap has to be honest on both.
+
+### Article angles
+
+- "sudo remembered, Ansible didn't: a one-character fix (`-k`) for a lying probe"
+- "Probe like the consumer: why checks that share your session state report fiction"
+- "The 15-minute window: sudo's credential cache as a hidden input to your scripts"
+- "NOPASSWD in the fixture, password on the laptop: the two machines every bootstrap must survive"
