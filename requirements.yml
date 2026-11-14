@@ -4,4 +4,4 @@ roles:
   - name: dev-toolchain
     src: https://github.com/mohammadrezachegini/ansible-role-dev-toolchain.git
     scm: git
-    version: v0.2.1
+    version: v0.2.2
