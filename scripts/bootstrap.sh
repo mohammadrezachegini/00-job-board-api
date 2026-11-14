@@ -32,5 +32,7 @@ fi
 
 # 3. The pinned dev-toolchain role, then the playbook
 ansible-galaxy role install -r requirements.yml
-if sudo -n true 2>/dev/null; then ask=(); else ask=(--ask-become-pass); fi
+# -k: ignore a password cached in THIS terminal; Ansible runs sudo without a terminal, so only
+# NOPASSWD sudo counts. (sudo -n alone said "yes" right after any sudo use, then Ansible failed.)
+if sudo -k -n true 2>/dev/null; then ask=(); else ask=(--ask-become-pass); fi
 ansible-playbook bootstrap.yml "${ask[@]}" "$@"
