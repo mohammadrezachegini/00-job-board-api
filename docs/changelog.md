@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-13 — bootstrap.sh: only skip --ask-become-pass for NOPASSWD sudo (ignore cached credentials) (9ea7e29)
+- 2026-11-14 — docs: update changelog [skip changelog] (e2492d0)
 - 2026-11-13 — Setup: dev-toolchain v0.2.2 (2b4c9e1)
 - 2026-11-12 — Setup: dev-toolchain v0.2.1 (568be46)
 - 2026-11-12 — Setup: scripts/bootstrap.sh (one command: prerequisites, uv, ansible-core, role, playbook) + fresh-machine test image (d990b98)
