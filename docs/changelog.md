@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-13 — docs: technical notes entry 46 — Ansible bootstrap for the local toolchain (0c6d4d4)
+- 2026-11-14 — docs: update changelog [skip changelog] (9cf7f4b)
 - 2026-11-13 — docs: journal — Ansible bootstrap for the local toolchain (ce76ffa)
 - 2026-11-13 — docs: update changelog [skip changelog] (1aa3813)
 - 2026-11-12 — Setup: bootstrap.yml with the dev-toolchain role (v0.1.0), requirements.yml, ansible.cfg, inventory (53f4008)
