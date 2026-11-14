@@ -2,6 +2,8 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-13 — docs: technical notes entries 47-48 — one-command bootstrap and the sudo -k fix (7facc01)
+- 2026-11-14 — docs: update changelog [skip changelog] (bbb5a38)
 - 2026-11-13 — docs: journal — one-command bootstrap, fresh-machine test, and the sudo -k fix (fdcb21e)
 - 2026-11-14 — docs: update changelog [skip changelog] (b530aa4)
 - 2026-11-13 — bootstrap.sh: only skip --ask-become-pass for NOPASSWD sudo (ignore cached credentials) (9ea7e29)
