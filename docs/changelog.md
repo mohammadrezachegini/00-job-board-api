@@ -2,6 +2,11 @@
 
 Generated automatically from commit messages on every push. Do not edit by hand.
 
+- 2026-11-13 — Setup: dev-toolchain v0.2.2 (2b4c9e1)
+- 2026-11-12 — Setup: dev-toolchain v0.2.1 (568be46)
+- 2026-11-12 — Setup: scripts/bootstrap.sh (one command: prerequisites, uv, ansible-core, role, playbook) + fresh-machine test image (d990b98)
+- 2026-11-12 — Setup: dev-toolchain v0.2.0 (verify step) (87b1826)
+- 2026-11-14 — docs: update changelog [skip changelog] (f1b0907)
 - 2026-11-13 — docs: technical notes entry 46 — Ansible bootstrap for the local toolchain (0c6d4d4)
 - 2026-11-14 — docs: update changelog [skip changelog] (9cf7f4b)
 - 2026-11-13 — docs: journal — Ansible bootstrap for the local toolchain (ce76ffa)
