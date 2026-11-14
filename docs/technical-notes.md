@@ -2095,3 +2095,116 @@ under gunicorn, and cache-metrics wiring.
 - "Portability is a thesis you test at the end: what Phase 6 cost because Phase 3 paid first"
 - "Draw both clouds in the diagram: making a runtime choice visible in the README"
 - "No real cloud resources yet — and why that's a scope line, not a gap"
+
+---
+
+## Entry 46 — 2026-11-12 — Ansible bootstrap for the local toolchain (commit `53f4008`)
+
+Project 00 turns Ansible — later in the portfolio as its own
+project — on the problem every earlier phase quietly assumed away:
+the developer machine itself. Four small files at the repo root
+declare the whole local toolchain as code, and a fresh Ubuntu
+machine goes from bare to ready with two commands:
+
+```bash
+ansible-galaxy role install -r requirements.yml
+ansible-playbook bootstrap.yml -K
+```
+
+(`-K` prompts for the sudo password the package installs need.)
+
+### The playbook is a declaration, not a script
+
+`bootstrap.yml` is 20 lines and contains no install logic at all.
+It names one play — "Install the Job Board API's local toolchain" —
+targets `hosts: localhost` with `connection: local`, and applies a
+single role, `dev-toolchain`, passing it one variable:
+
+```yaml
+toolchain_tools:
+  - python3.12
+  - docker
+  - postgresql-client
+  - redis-cli
+  - awscli
+  - localstack
+  - awslocal
+  - azurite
+  - pre-commit
+```
+
+That split is the design. The *what* (which tools this project
+needs) lives here, where a reader of this repo can see it at a
+glance; the *how* (apt packages, repositories, per-tool quirks)
+lives inside the role, which is a separate, reusable artifact. Any
+later project can apply the same role with a different list.
+
+And the list itself is a map of the phases that came before it:
+Python 3.12 is the app's own interpreter, Docker runs the compose
+stack, the PostgreSQL and Redis CLIs talk to its services, the AWS
+CLI + LocalStack + `awslocal` are Phase 3's local AWS, Azurite is
+Phase 6's local Azure, and pre-commit guards the commits. Read
+top to bottom, `toolchain_tools` is the project's dependency list
+for a human's machine — the counterpart of `pyproject.toml` for
+its Python environment.
+
+### A pinned, downloaded dependency — not vendored code
+
+`requirements.yml` pulls the role from its own repository
+(`github.com/mohammadrezachegini/ansible-role-dev-toolchain`),
+`scm: git`, pinned at `version: v0.1.0`. Two choices matter here:
+
+- **Pinned, not floating.** `v0.1.0` means every bootstrap runs the
+  same role code; the setup cannot silently change because the
+  role's default branch moved. A deliberate version bump upgrades
+  the toolchain — the same discipline as a locked Python dependency.
+- **Downloaded, not copied in.** `ansible.cfg` sets
+  `roles_path = roles`, and the comment there spells out that the
+  `roles/` directory is git-ignored: a downloaded dependency, not
+  source. This repo declares the dependency; `ansible-galaxy`
+  materialises it, exactly as pip materialises a requirements file
+  into a virtualenv that is itself never committed.
+
+### Localhost is a real target
+
+`inventory.ini` is one line:
+
+```ini
+localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3
+```
+
+Ansible is usually introduced as a tool for fleets of remote
+servers over SSH; here the fleet is one machine and there is no
+SSH at all (`connection: local`). The second variable is the
+subtle one, and `ansible.cfg`'s comment gives its reason away:
+the interpreter is pinned to `/usr/bin/python3` — Ubuntu's system
+Python — "because it has python3-apt, which the apt module needs."
+If Ansible ran its modules under a pyenv or virtualenv Python, the
+`apt` module would fail for want of a system binding no virtualenv
+carries. It is the same lesson as entry 45's gunicorn socket, in
+mirror image: automation runs in a specific interpreter/host
+context, and the working setup is the one that says which context
+out loud instead of inheriting whatever happens to be active.
+
+### Scope, stated honestly
+
+This commit declares intent in *this* repository; the role's own
+tasks live in the role's repository and are not part of this
+commit, so what is proved here is the wiring — the playbook
+parses its role and variable, Galaxy can fetch the pinned role,
+and the config and inventory line up. The header comment also
+states the boundary: "Readies a machine for this project
+(Ubuntu)." One operating system, one host, one role — a bootstrap,
+not a configuration-management system yet. That is the right
+size for a first Ansible step inside Project 00, and a preview of
+the dedicated Ansible project later in the portfolio, where the
+same ideas — roles, inventories, pinned dependencies — will be
+aimed at more than the machine under the author's own desk.
+
+### Article angles
+
+- "Your laptop is infrastructure too: a 20-line playbook that rebuilds a dev machine"
+- "Declare the what, pin the how: toolchain_tools in the playbook, v0.1.0 in requirements.yml"
+- "Downloaded, not vendored: why roles/ is git-ignored, like a virtualenv"
+- "The interpreter is part of the config: python3-apt, /usr/bin/python3, and modules that fail in a venv"
+- "A tool list as a project map: reading Phases 3-6 back out of nine package names"
