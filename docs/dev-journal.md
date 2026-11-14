@@ -510,3 +510,18 @@ This journal is updated as new work is pushed.
   closes Phase 6: status banner, both clouds in the architecture
   diagram, and the terminal checks updated with the Azure runs.
   Technical breakdown in `docs/technical-notes.md`, entry 45.
+- 2026-11-12 (commit `53f4008`, "Setup: bootstrap.yml with the
+  dev-toolchain role (v0.1.0), requirements.yml, ansible.cfg,
+  inventory"): the project can now set up its own developer
+  machine. A small Ansible playbook at the repo root, `bootstrap.yml`,
+  runs against the local machine itself and applies one role —
+  `dev-toolchain`, pinned at version v0.1.0 and fetched from its own
+  GitHub repository with `ansible-galaxy` — passing it the list of
+  tools this project needs: Python 3.12, Docker, the PostgreSQL and
+  Redis command-line clients, the AWS CLI with LocalStack and
+  `awslocal`, Azurite for Azure, and pre-commit. Two small config
+  files support it: `ansible.cfg` points Ansible at the downloaded
+  roles and the inventory, and `inventory.ini` names just localhost,
+  using the system Python. Instead of a README page of manual install
+  steps, a fresh Ubuntu machine is readied with two commands.
+  Technical breakdown in `docs/technical-notes.md`, entry 46.
