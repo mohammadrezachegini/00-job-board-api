@@ -525,3 +525,29 @@ This journal is updated as new work is pushed.
   using the system Python. Instead of a README page of manual install
   steps, a fresh Ubuntu machine is readied with two commands.
   Technical breakdown in `docs/technical-notes.md`, entry 46.
+- 2026-11-12 (commits `87b1826` + `d990b98` + `568be46`, the
+  bootstrap becomes one command): entry 46's setup assumed Ansible
+  was already installed; now `scripts/bootstrap.sh` closes that
+  gap. Run from anywhere, it installs only what is missing — the
+  apt prerequisites Ansible itself needs (curl, git, python3-apt),
+  uv pinned at 0.13.0 (the same uv as the Dockerfile and the role),
+  and ansible-core as a uv tool — then fetches the pinned
+  dev-toolchain role and runs the playbook, passing any extra
+  arguments through to it (for example `--tags verify`). The role
+  pin moved twice the same evening: v0.1.0 to v0.2.0, whose headline
+  is a new verify step in the role, then on to v0.2.1. A
+  fresh-machine test image (`scripts/fresh-machine-test/Dockerfile`:
+  bare Ubuntu 26.04 plus sudo and an unprivileged user with
+  passwordless sudo) gives the one-command promise a machine it has
+  never touched to prove itself against. Technical breakdown in
+  `docs/technical-notes.md`, entry 47.
+- 2026-11-13 (commits `2b4c9e1` + `9ea7e29`, the sudo probe learns
+  `-k`): the role pin moves to v0.2.2, and `bootstrap.sh` fixes how
+  it decides whether Ansible needs to ask for a sudo password. The
+  old probe, `sudo -n true`, also said yes when sudo only
+  remembered a password typed earlier in that terminal — but
+  Ansible runs sudo without that terminal, so the playbook then
+  failed. The probe is now `sudo -k -n true`, ignoring cached
+  credentials: only genuinely passwordless (NOPASSWD) sudo skips
+  `--ask-become-pass`. Technical breakdown in
+  `docs/technical-notes.md`, entry 48.
